@@ -15,8 +15,9 @@ All data is currently stored locally in the browser (localStorage).
 
 ## Tech stack
 
-Vite, React 19, TypeScript, React Router, Recharts and Zod. Tooling: ESLint, Prettier, Vitest
-and GitHub Actions.
+Frontend: Vite, React 19, TypeScript, React Router, Recharts and Zod. Backend (in progress):
+Fastify 5, Zod and PostgreSQL 16 (Docker Compose). Tooling: ESLint, Prettier, Vitest and GitHub
+Actions.
 
 ## Getting started
 
@@ -26,6 +27,17 @@ Requires Node.js 26.
 npm ci
 npm run dev
 ```
+
+The backend (`server/`) also needs Docker:
+
+```bash
+docker compose up -d postgres
+npm --prefix server ci
+cp server/.env.example server/.env   # then set JWT_SECRET
+npm --prefix server run dev
+```
+
+See [`docs/setup.md`](./docs/setup.md) for env vars and server scripts.
 
 ## Scripts
 
@@ -42,18 +54,19 @@ npm run dev
 | `npm run test:coverage` | Run tests with coverage thresholds enforced |
 
 CI (`.github/workflows/ci.yml`) runs lint, format check, typecheck, coverage, build and
-`npm audit` on every push and pull request.
+`npm audit` on every push and pull request, with a separate job for `server/`.
 
 ## Project structure
 
 ```
 src/        React app (pages, components, store, utils)
 shared/     Zod schemas and the data types inferred from them (@shared/* alias)
+server/     Fastify API (separate npm package)
 docs/       Project documentation
 ```
 
 ## Documentation
 
-- [`docs/`](./docs/README.md): setup, testing, changelog and task records
+- [`docs/`](./docs/README.md): setup, backend, API, testing, changelog and task records
 - [`PRODUCTION_RULES.md`](./PRODUCTION_RULES.md): development, testing, security and release rules
 - [`TASKS.md`](./TASKS.md): frontend (`TF`) and backend (`TB`) task backlog

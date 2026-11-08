@@ -29,3 +29,42 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ironlog
+          POSTGRES_PASSWORD: ironlog
+          POSTGRES_DB: ironlog_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ironlog -d ironlog_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ironlog:ironlog@localhost:5432/ironlog_test
+      JWT_SECRET: ci-only-jwt-secret-not-used-in-production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
