@@ -182,7 +182,7 @@ All endpoints live under `/api/v1`, return JSON, and report errors as RFC 9457 P
 standard HTTP status codes only (PRODUCTION_RULES §3.3). From TB03 on, every resource requires auth
 and is scoped to the current user; another user's resource returns 404.
 
-### [?] TB01 — Server scaffold
+### [x] TB01 — Server scaffold
 
 **Branch:** `feat/tb01-server-scaffold`
 
