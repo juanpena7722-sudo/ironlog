@@ -39,7 +39,7 @@ Releases (versioning, tags, deployment) are decided and triggered by the owner o
 
 ## Frontend Tasks (TF)
 
-### [?] TF00 — Foundation: tooling, shared schemas, CI
+### [x] TF00 — Foundation: tooling, shared schemas, CI
 
 **Branch:** `chore/SH-01-foundation` (created before the ID scheme; formerly SH-01)
 
