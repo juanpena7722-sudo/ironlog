@@ -1,6 +1,15 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { useStore } from '../store'
 import type { BodyEntry } from '../types'
 import { Card, Empty, PageHead, Stat, chart } from '../components/ui'
@@ -15,7 +24,15 @@ const FIELDS = [
 ] as const
 
 type Form = Record<'date' | 'weight' | (typeof FIELDS)[number][0], string>
-const emptyForm = (): Form => ({ date: today(), weight: '', bodyFat: '', chest: '', waist: '', arms: '', thighs: '' })
+const emptyForm = (): Form => ({
+  date: today(),
+  weight: '',
+  bodyFat: '',
+  chest: '',
+  waist: '',
+  arms: '',
+  thighs: '',
+})
 
 export default function Progress() {
   const { data, upsert, remove } = useStore()
@@ -28,7 +45,9 @@ export default function Progress() {
   const latest = asc.at(-1)
 
   const weekAvg = (from: number, to: number) => {
-    const xs = asc.filter((b) => b.date > daysAgo(to) && b.date <= daysAgo(from)).map((b) => b.weight)
+    const xs = asc
+      .filter((b) => b.date > daysAgo(to) && b.date <= daysAgo(from))
+      .map((b) => b.weight)
     return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : undefined
   }
   const thisWeek = weekAvg(0, 7)
@@ -65,10 +84,22 @@ export default function Progress() {
       <PageHead title="Progress" sub="Bodyweight, body fat and measurements over time." />
 
       <div className="stats">
-        <Stat label="Current weight" value={latest ? `${latest.weight} ${unit}` : '—'} sub={latest && fmtDate(latest.date)} />
-        <Stat label="7-day average" value={thisWeek ? `${round(thisWeek)} ${unit}` : '—'} sub={`vs last week: ${delta(thisWeek, lastWeek)}`} />
+        <Stat
+          label="Current weight"
+          value={latest ? `${latest.weight} ${unit}` : '—'}
+          sub={latest && fmtDate(latest.date)}
+        />
+        <Stat
+          label="7-day average"
+          value={thisWeek ? `${round(thisWeek)} ${unit}` : '—'}
+          sub={`vs last week: ${delta(thisWeek, lastWeek)}`}
+        />
         <Stat label="30-day change" value={delta(latest?.weight, monthAgo?.weight)} />
-        <Stat label="To target" value={latest ? delta(targetWeight, latest.weight) : '—'} sub={`Target ${targetWeight} ${unit}`} />
+        <Stat
+          label="To target"
+          value={latest ? delta(targetWeight, latest.weight) : '—'}
+          sub={`Target ${targetWeight} ${unit}`}
+        />
       </div>
 
       <div className="grid-2">
@@ -77,23 +108,50 @@ export default function Progress() {
           action={
             <select value={metric} onChange={(e) => setMetric(e.target.value as typeof metric)}>
               <option value="weight">Weight</option>
-              {FIELDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              {FIELDS.map(([k, l]) => (
+                <option key={k} value={k}>
+                  {l}
+                </option>
+              ))}
             </select>
           }
         >
-          {series.length < 2 ? <Empty>Add at least two entries to see a trend.</Empty> : (
+          {series.length < 2 ? (
+            <Empty>Add at least two entries to see a trend.</Empty>
+          ) : (
             <div className="chart">
               <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={series}>
                   <CartesianGrid stroke={chart.grid} vertical={false} />
                   <XAxis dataKey="label" tick={chart.axis} tickLine={false} axisLine={false} />
-                  <YAxis tick={chart.axis} tickLine={false} axisLine={false} width={44} domain={['auto', 'auto']} />
+                  <YAxis
+                    tick={chart.axis}
+                    tickLine={false}
+                    axisLine={false}
+                    width={44}
+                    domain={['auto', 'auto']}
+                  />
                   <Tooltip {...chart.tooltip} />
                   {metric === 'weight' && (
-                    <ReferenceLine y={targetWeight} stroke={chart.tertiary} strokeDasharray="4 4"
-                      label={{ value: 'target', fill: 'var(--muted)', fontSize: 11, position: 'insideTopRight' }} />
+                    <ReferenceLine
+                      y={targetWeight}
+                      stroke={chart.tertiary}
+                      strokeDasharray="4 4"
+                      label={{
+                        value: 'target',
+                        fill: 'var(--muted)',
+                        fontSize: 11,
+                        position: 'insideTopRight',
+                      }}
+                    />
                   )}
-                  <Line type="monotone" dataKey="value" stroke={chart.primary} strokeWidth={2} dot={{ r: 3 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke={chart.primary}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -105,33 +163,58 @@ export default function Progress() {
             <div className="form-grid">
               <label>
                 Date
-                <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => setForm({ ...form, date: e.target.value })}
+                />
               </label>
               <label>
                 Weight ({unit}) *
-                <input type="number" step={0.1} min={0} required value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} />
+                <input
+                  type="number"
+                  step={0.1}
+                  min={0}
+                  required
+                  value={form.weight}
+                  onChange={(e) => setForm({ ...form, weight: e.target.value })}
+                />
               </label>
               {FIELDS.map(([k, l]) => (
                 <label key={k}>
-                  {l}{k === 'bodyFat' ? '' : ` (${lenUnit})`}
-                  <input type="number" step={0.1} min={0} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
+                  {l}
+                  {k === 'bodyFat' ? '' : ` (${lenUnit})`}
+                  <input
+                    type="number"
+                    step={0.1}
+                    min={0}
+                    value={form[k]}
+                    onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+                  />
                 </label>
               ))}
             </div>
-            <p className="muted small">Weigh in every morning, same conditions. Only weight is required.</p>
+            <p className="muted small">
+              Weigh in every morning, same conditions. Only weight is required.
+            </p>
             <button type="submit">Save check-in</button>
           </form>
         </Card>
       </div>
 
       <Card title="Check-ins">
-        {asc.length === 0 ? <Empty>No check-ins yet.</Empty> : (
+        {asc.length === 0 ? (
+          <Empty>No check-ins yet.</Empty>
+        ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Date</th><th>Weight</th>
-                  {FIELDS.map(([k, l]) => <th key={k}>{l}</th>)}
+                  <th>Date</th>
+                  <th>Weight</th>
+                  {FIELDS.map(([k, l]) => (
+                    <th key={k}>{l}</th>
+                  ))}
                   <th />
                 </tr>
               </thead>
@@ -139,9 +222,19 @@ export default function Progress() {
                 {[...data.body].sort(byDateDesc).map((b) => (
                   <tr key={b.id}>
                     <td>{fmtDate(b.date)}</td>
-                    <td><strong>{b.weight}</strong></td>
-                    {FIELDS.map(([k]) => <td key={k} className="muted">{b[k] ?? '—'}</td>)}
-                    <td><button className="ghost danger small" onClick={() => remove('body', b.id)}>✕</button></td>
+                    <td>
+                      <strong>{b.weight}</strong>
+                    </td>
+                    {FIELDS.map(([k]) => (
+                      <td key={k} className="muted">
+                        {b[k] ?? '—'}
+                      </td>
+                    ))}
+                    <td>
+                      <button className="ghost danger small" onClick={() => remove('body', b.id)}>
+                        ✕
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

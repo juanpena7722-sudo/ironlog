@@ -6,7 +6,7 @@ export const uid = (): string =>
     : Math.random().toString(36).slice(2) + Date.now().toString(36)
 
 /** Local-time yyyy-mm-dd (toISOString would shift to UTC). */
-export function toISO(d: Date): ISODate {
+function toISO(d: Date): ISODate {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
@@ -33,7 +33,10 @@ export function fmtDate(iso: ISODate): string {
 export function fmtLongDate(iso: ISODate): string {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
   })
 }
 

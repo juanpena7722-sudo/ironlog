@@ -24,7 +24,9 @@ export default function App() {
         </div>
         {NAV.map((n) => (
           <NavLink key={n.to} to={n.to} end={n.to === '/'} className="nav-link">
-            <span className="nav-icon" aria-hidden>{n.icon}</span>
+            <span className="nav-icon" aria-hidden>
+              {n.icon}
+            </span>
             <span className="nav-label">{n.label}</span>
           </NavLink>
         ))}
