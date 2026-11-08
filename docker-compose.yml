@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ironlog
+      POSTGRES_PASSWORD: ironlog
+      POSTGRES_DB: ironlog_dev
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    configs:
+      - source: create-test-db
+        target: /docker-entrypoint-initdb.d/create-test-db.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ironlog -d ironlog_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+configs:
+  create-test-db:
+    content: CREATE DATABASE ironlog_test;
+
+volumes:
+  postgres-data:
