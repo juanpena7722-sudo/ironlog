@@ -238,7 +238,7 @@ and is scoped to the current user; another user's resource returns 404.
    403 foreign Origin; 429 rate limit; account deletion removes all rows.
 2. The password hash never appears in a response or log (asserted).
 
-### [ ] TB04 — Workouts API
+### [?] TB04 — Workouts API
 
 **Branch:** `feat/tb04-workouts-api`
 
