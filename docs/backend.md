@@ -158,20 +158,18 @@ the process exits with a non-zero code before listening.
 | Verify    | Only `HS256` accepted; signature and expiry checked                       |
 
 Sessions are stateless. Logout and account deletion clear the cookie but do not revoke the
-token itself; it stays cryptographically valid until it expires.
+token itself; it stays cryptographically valid until it expires. After account deletion,
+`requireAuth` rejects it because the user no longer exists.
 
 ### `requireAuth`
 
-`app.requireAuth` is a `preHandler`. It verifies the session cookie and sets `request.userId`
-(the token's `sub`). Any failure (missing, expired, tampered, wrong secret) throws 401
-`Not authenticated`. Use it on every route that needs a user:
+`app.requireAuth` is a `preHandler`. It verifies the session cookie, sets `request.userId`
+(the token's `sub`) and checks that the user still exists. Any failure (missing, expired,
+tampered, wrong secret, deleted user) throws 401 `Not authenticated`. Use it on every route that needs a user:
 
 ```ts
 app.get('/me', { preHandler: app.requireAuth }, async (request) => { /* request.userId */ })
 ```
-
-`requireAuth` does not check that the user still exists; `GET /auth/me` and
-`DELETE /auth/account` look the user up and return 401 if it is gone.
 
 ### Origin check (CSRF)
 

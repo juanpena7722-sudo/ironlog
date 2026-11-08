@@ -6,7 +6,8 @@
   `GET /api/v1/auth/me` and `DELETE /api/v1/auth/account` in `server/src/auth.ts`.
 - Added: register creates the default goals; account deletion removes the user and all of their
   data.
-- Added: `app.requireAuth` preHandler that sets `request.userId` from the session.
+- Added: `app.requireAuth` preHandler that sets `request.userId` from the session and returns
+  401 if the user no longer exists.
 - Added: dependencies `@fastify/cookie`, `@fastify/jwt`, `@fastify/rate-limit` and `argon2`
   (`^0.41.1`, see the glibc note in `setup.md`).
 - Changed: `buildApp(env, logStream?)` accepts an optional log stream so tests can read logs.
