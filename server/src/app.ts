@@ -2,6 +2,7 @@ import { STATUS_CODES } from 'node:http'
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply } from 'fastify'
 import sensible from '@fastify/sensible'
 import { ZodError } from 'zod'
+import { registerAuth } from './auth.js'
 import { createDb } from './db.js'
 import type { Env } from './env.js'
 
@@ -14,8 +15,19 @@ function sendProblem(reply: FastifyReply, status: number, detail: string, errors
     .send({ type: 'about:blank', title: STATUS_CODES[status], status, detail, errors })
 }
 
-export function buildApp(env: Env): FastifyInstance {
-  const app = Fastify({ logger: { level: env.NODE_ENV === 'test' ? 'silent' : 'info' } })
+const LOG_REDACT_PATHS = [
+  'req.headers.authorization',
+  'req.headers.cookie',
+  'res.headers["set-cookie"]',
+  'password',
+  '*.password',
+]
+
+export function buildApp(env: Env, logStream?: { write(message: string): void }): FastifyInstance {
+  const isSilent = env.NODE_ENV === 'test' && !logStream
+  const app = Fastify({
+    logger: { level: isSilent ? 'silent' : 'info', stream: logStream, redact: LOG_REDACT_PATHS },
+  })
 
   app.register(sensible)
 
@@ -41,6 +53,8 @@ export function buildApp(env: Env): FastifyInstance {
     const detail = env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'
     return sendProblem(reply, status, detail)
   })
+
+  registerAuth(app, env)
 
   app.get('/api/v1/health', async () => ({ status: 'ok' }))
 
