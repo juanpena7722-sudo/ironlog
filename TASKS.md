@@ -44,7 +44,7 @@ A task may start only when every task in its **Depends on** is `[x]`.
 
 ## 0. Shared Foundation
 
-### [?] SH-01 — Foundation: tooling, shared schemas, CI
+### [x] SH-01 — Foundation: tooling, shared schemas, CI
 
 **Branch:** `chore/SH-01-foundation`
 
