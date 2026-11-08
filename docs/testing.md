@@ -32,17 +32,42 @@ coverage.
 The server has its own Vitest config, `server/vitest.config.ts`, which runs `server/src/**/*.test.ts`.
 API tests call `buildApp()` and send requests with `app.inject()`; no port is opened.
 
+The tests use the real PostgreSQL database `ironlog_test`. Start it and apply the migrations
+first:
+
 ```bash
+docker compose up -d postgres
+npm --prefix server run db:migrate:test
 npm --prefix server test               # run once
 npm --prefix server run test:coverage  # run with coverage and thresholds
 ```
 
-| File                     | Covers                                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `server/src/app.test.ts` | Health 200; 404, 400 (Zod, with `errors`), 409 (`httpErrors`) and 500 Problem Details; 500 hides internals in production. |
-| `server/src/env.test.ts` | Valid env with `PORT` default 3000; rejects a `JWT_SECRET` shorter than 32 characters.                                    |
+| File                     | Covers                                                                                                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/src/app.test.ts` | Health 200; 404, 400 (Zod, with `errors`), 409 (`httpErrors`) and 500 Problem Details; 500 hides internals in production.                                                                                           |
+| `server/src/env.test.ts` | Valid env with `PORT` default 3000; rejects a `JWT_SECRET` shorter than 32 characters.                                                                                                                              |
+| `server/src/db.test.ts`  | CRUD for every model; unique lowercase email; one `Goals` per user; exercise and set order by `position`; `Decimal` kg/cm values; one health entry per user per day; cascade delete from `Workout` and from `User`. |
 
-Coverage measures `server/src/**/*.ts` except test files and `src/server.ts` (the entry point),
+### Test database
+
+`server/src/test/db.ts` exports:
+
+| Export               | Use                                                                                                   |
+| -------------------- | ----------------------------------------------------------------------------------------------------- |
+| `TEST_ENV`           | An `Env` with `NODE_ENV=test` and `DATABASE_URL` pointing at `ironlog_test`. Pass it to `buildApp()`. |
+| `truncateTables(db)` | Runs `TRUNCATE TABLE "User" CASCADE`, which empties every table.                                      |
+
+A test file that uses the database calls `truncateTables(app.db)` before its tests and
+`app.close()` after them, which disconnects the client. `db.test.ts` also truncates before each
+test.
+`server/vitest.config.ts` sets `fileParallelism: false`, so test files run one at a time and do
+not truncate each other's data.
+
+If the schema in `ironlog_test` is out of date or broken, the owner runs
+`npm --prefix server run db:reset:test` (see [`setup.md`](./setup.md#database-scripts)).
+
+Coverage measures `server/src/**/*.ts` except test files, `src/server.ts` (the entry point) and
+the generated Prisma client (`src/generated/**`),
 with thresholds of 90 % lines and 85 % branches. Reports go to `server/coverage/` (git-ignored).
 
-_Last updated by TB01._
+_Last updated by TB02._

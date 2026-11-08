@@ -35,8 +35,12 @@ The API is a separate package in `server/` with its own lockfile.
 docker compose up -d postgres
 npm --prefix server ci
 cp server/.env.example server/.env   # then set JWT_SECRET
+npm --prefix server run db:migrate
 npm --prefix server run dev
 ```
+
+`npm --prefix server ci` also runs `prisma generate` (`postinstall`), which writes the Prisma
+client to `server/src/generated/prisma` (git-ignored).
 
 The server listens on `http://127.0.0.1:3000` (`GET /api/v1/health` returns `{"status":"ok"}`).
 
@@ -64,15 +68,42 @@ docker compose down -v          # stop and delete data
 
 Run with `npm --prefix server run <script>` or from inside `server/`.
 
-| Script          | What it does                                                         |
-| --------------- | -------------------------------------------------------------------- |
-| `dev`           | Starts `src/server.ts` with `tsx watch`, loading `server/.env`.      |
-| `build`         | Bundles `src/server.ts` with tsup to `server/dist/server.js` (ESM).  |
-| `start`         | Runs `node dist/server.js`. Env vars must be set in the environment. |
-| `lint`          | Runs ESLint with `server/eslint.config.js`.                          |
-| `typecheck`     | Runs `tsc --noEmit`.                                                 |
-| `test`          | Runs the Vitest suite once.                                          |
-| `test:coverage` | Runs Vitest with v8 coverage and enforces the thresholds.            |
+| Script            | What it does                                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------------------- |
+| `dev`             | Starts `src/server.ts` with `tsx watch`, loading `server/.env`.                                    |
+| `build`           | Bundles `src/server.ts` with tsup to `server/dist/server.js` (ESM).                                |
+| `start`           | Runs `node dist/server.js`. Env vars must be set in the environment.                               |
+| `lint`            | Runs ESLint with `server/eslint.config.js`.                                                        |
+| `typecheck`       | Runs `tsc --noEmit`.                                                                               |
+| `test`            | Runs the Vitest suite once.                                                                        |
+| `test:coverage`   | Runs Vitest with v8 coverage and enforces the thresholds.                                          |
+| `postinstall`     | Runs `prisma generate` after `npm ci` / `npm install`.                                             |
+| `db:migrate`      | Runs `prisma migrate dev` against `DATABASE_URL` (from `server/.env`).                             |
+| `db:migrate:test` | Runs `prisma migrate deploy` against `ironlog_test`.                                               |
+| `db:reset:test`   | Runs `prisma migrate reset --force` against `ironlog_test` (drops all data, reapplies migrations). |
+| `db:seed`         | Runs `prisma db seed` (`tsx prisma/seed.ts`) against `DATABASE_URL`.                               |
+
+### Database scripts
+
+Prisma reads its settings from `server/prisma.config.ts`, which loads `server/.env` when it
+exists. `db:migrate:test` and `db:reset:test` set their own `DATABASE_URL`
+(`postgresql://ironlog:ironlog@localhost:5432/ironlog_test`).
+
+```bash
+npm --prefix server run db:migrate        # dev database: apply migrations, create new ones
+npm --prefix server run db:migrate:test   # test database: apply committed migrations
+npm --prefix server run db:reset:test     # test database: drop everything and reapply
+npm --prefix server run db:seed           # load the demo user into DATABASE_URL
+```
+
+`db:seed` needs the full server env (`NODE_ENV`, `DATABASE_URL`, `JWT_SECRET`) and a migrated
+database. It deletes the user `demo@ironlog.local` if present, then creates it again with goals,
+workouts, food, body and health entries from `makeDemoData()` in `src/demo.ts`. Running it twice
+leaves one demo user. The demo user's `passwordHash` is an empty placeholder, so it cannot log
+in. The seed runs under tsx and is not part of the server `typecheck`.
+
+`db:reset:test` is destructive. Prisma 7 refuses to run `migrate reset` when it detects that an
+AI agent invoked it, so only the owner runs this script.
 
 ## Path alias
 
@@ -118,6 +149,7 @@ The `backend` job runs in `server/` with a `postgres:16` service (database `iron
 npm ci
 npm run lint
 npm run typecheck
+npm run db:migrate:test
 npm run test:coverage
 npm run build
 npm audit --omit=dev --audit-level=high
@@ -125,4 +157,4 @@ npm audit --omit=dev --audit-level=high
 
 The audit steps fail only on high or critical advisories in production dependencies.
 
-_Last updated by TB01._
+_Last updated by TB02._
