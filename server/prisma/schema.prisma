@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Unit {
+  kg
+  lb
+}
+
+enum Meal {
+  Breakfast
+  Lunch
+  Dinner
+  Snack
+}
+
+model User {
+  id            String        @id @default(uuid()) @db.Uuid
+  email         String        @unique
+  passwordHash  String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  goals         Goals?
+  workouts      Workout[]
+  exercises     Exercise[]
+  workoutSets   WorkoutSet[]
+  foodEntries   FoodEntry[]
+  bodyEntries   BodyEntry[]
+  healthEntries HealthEntry[]
+}
+
+model Goals {
+  userId       String   @id @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit         Unit
+  calories     Float
+  protein      Float
+  carbs        Float
+  fat          Float
+  targetWeight Decimal  @db.Decimal(6, 2)
+  waterL       Float
+  sleepHours   Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Workout {
+  id          String     @id @default(uuid()) @db.Uuid
+  userId      String     @db.Uuid
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime   @db.Date
+  name        String     @db.VarChar(100)
+  durationMin Float?
+  notes       String?    @db.VarChar(2000)
+  exercises   Exercise[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId, date])
+}
+
+model Exercise {
+  id        String       @id @default(uuid()) @db.Uuid
+  userId    String       @db.Uuid
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutId String       @db.Uuid
+  workout   Workout      @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  position  Int
+  name      String       @db.VarChar(100)
+  muscle    String       @db.VarChar(100)
+  sets      WorkoutSet[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([workoutId, position])
+  @@index([userId])
+}
+
+model WorkoutSet {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId String   @db.Uuid
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  position   Int
+  reps       Int
+  weight     Decimal  @db.Decimal(6, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([exerciseId, position])
+  @@index([userId])
+}
+
+model FoodEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  meal      Meal
+  name      String   @db.VarChar(100)
+  calories  Float
+  protein   Float
+  carbs     Float
+  fat       Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+}
+
+model BodyEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  weight    Decimal  @db.Decimal(6, 2)
+  bodyFat   Float?
+  chest     Decimal? @db.Decimal(6, 2)
+  waist     Decimal? @db.Decimal(6, 2)
+  arms      Decimal? @db.Decimal(6, 2)
+  thighs    Decimal? @db.Decimal(6, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+}
+
+model HealthEntry {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date       DateTime @db.Date
+  sleepHours Float?
+  waterL     Float?
+  restingHR  Float?
+  steps      Int?
+  energy     Int?
+  notes      String?  @db.VarChar(2000)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, date])
+}

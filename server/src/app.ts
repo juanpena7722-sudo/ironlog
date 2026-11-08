@@ -2,6 +2,7 @@ import { STATUS_CODES } from 'node:http'
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply } from 'fastify'
 import sensible from '@fastify/sensible'
 import { ZodError } from 'zod'
+import { createDb } from './db.js'
 import type { Env } from './env.js'
 
 type FieldError = { path: string; message: string }
@@ -17,6 +18,9 @@ export function buildApp(env: Env): FastifyInstance {
   const app = Fastify({ logger: { level: env.NODE_ENV === 'test' ? 'silent' : 'info' } })
 
   app.register(sensible)
+
+  app.decorate('db', createDb(env.DATABASE_URL))
+  app.addHook('onClose', () => app.db.$disconnect())
 
   app.setNotFoundHandler((request, reply) =>
     sendProblem(reply, 404, `Route ${request.method} ${request.url} not found`),

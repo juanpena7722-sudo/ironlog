@@ -1,5 +1,23 @@
 # Changelog
 
+## TB02 — Database schema and migrations (2026-11-08)
+
+- Added: Prisma 7 with `@prisma/adapter-pg`; models `User`, `Goals`, `Workout`, `Exercise`,
+  `WorkoutSet`, `FoodEntry`, `BodyEntry`, `HealthEntry` in `server/prisma/schema.prisma`, and
+  the committed `init` migration.
+- Added: weights in kg and lengths in cm as `Decimal(6,2)`; calendar days as `date`; `position`
+  ordering for exercises and sets; `(userId, date)` indexes; `HealthEntry` unique on
+  `(userId, date)`; cascade deletes from `User` and `Workout`.
+- Added: `app.db` (Prisma client from `createDb()` in `server/src/db.ts`), disconnected on
+  `app.close()`.
+- Added: server scripts `postinstall` (`prisma generate`), `db:migrate`, `db:migrate:test`,
+  `db:reset:test`, `db:seed` (demo user from `src/demo.ts`).
+- Added: `server/src/test/db.ts` (`TEST_ENV`, `truncateTables()`) and `server/src/db.test.ts`.
+- Changed: server tests run one file at a time (`fileParallelism: false`); the CI `backend` job
+  runs `db:migrate:test` before the tests.
+- Security: emails must be lowercase (`CHECK` constraint); all queries go through Prisma
+  parameterised queries.
+
 ## TB01 — Server scaffold (2026-11-08)
 
 - Added: `server/` package (Fastify 5, ESM, Node.js 26, strict TypeScript) with ESLint, Vitest,

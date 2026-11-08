@@ -13,10 +13,17 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:test": "DATABASE_URL=postgresql://ironlog:ironlog@localhost:5432/ironlog_test prisma migrate deploy",
+    "db:reset:test": "DATABASE_URL=postgresql://ironlog:ironlog@localhost:5432/ironlog_test prisma migrate reset --force",
+    "db:seed": "prisma db seed"
   },
   "dependencies": {
     "@fastify/sensible": "^6.0.7",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "fastify": "^5.12.8",
     "zod": "^4.6.7"
   },
@@ -28,6 +35,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.14.0",
     "prettier": "^3.9.10",
+    "prisma": "^7.10.1",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
