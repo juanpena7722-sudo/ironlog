@@ -26,15 +26,17 @@ Vitest and tsup resolve `zod` at run and build time without extra configuration.
 
 ## Modules
 
-| File                     | Purpose                                                                                                                                                                                                                                                                                               |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/src/env.ts`      | `parseEnv(source)` validates environment variables with Zod and returns a typed `Env`. It throws on invalid input.                                                                                                                                                                                    |
-| `server/src/app.ts`      | `buildApp(env, logStream?)` creates the Fastify instance: configures the logger, registers `@fastify/sensible`, decorates `app.db`, adds the 404 and global error handlers, calls `registerAuth()`, adds the health route and registers `workoutRoutes` under `/api/v1/workouts`. It does not listen. |
-| `server/src/auth.ts`     | `registerAuth(app, env)` registers cookies, JWT, the auth rate limit, `app.requireAuth`, the Origin check and the `/api/v1/auth` routes (see [Authentication](#authentication)).                                                                                                                      |
-| `server/src/workouts.ts` | `workoutRoutes` plugin: the 5 `/api/v1/workouts` routes (see [Workouts](#workouts)).                                                                                                                                                                                                                  |
-| `server/src/db.ts`       | `createDb(databaseUrl)` returns a `PrismaClient` that uses the `@prisma/adapter-pg` driver adapter. It also declares the `app.db` type on `FastifyInstance`.                                                                                                                                          |
-| `server/src/server.ts`   | Entry point. Parses `process.env`, builds the app and listens on `127.0.0.1:<PORT>`.                                                                                                                                                                                                                  |
-| `server/src/test/db.ts`  | Test helpers: `TEST_ENV` (an `Env` pointing at `ironlog_test`) and `truncateTables(db)`.                                                                                                                                                                                                              |
+| File                     | Purpose                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/src/env.ts`      | `parseEnv(source)` validates environment variables with Zod and returns a typed `Env`. It throws on invalid input.                                                                                                                                                                                                                           |
+| `server/src/app.ts`      | `buildApp(env, logStream?)` creates the Fastify instance: configures the logger, registers `@fastify/sensible`, decorates `app.db`, adds the 404 and global error handlers, calls `registerAuth()`, adds the health route and registers `workoutRoutes` under `/api/v1/workouts` and `foodRoutes` under `/api/v1/foods`. It does not listen. |
+| `server/src/auth.ts`     | `registerAuth(app, env)` registers cookies, JWT, the auth rate limit, `app.requireAuth`, the Origin check and the `/api/v1/auth` routes (see [Authentication](#authentication)).                                                                                                                                                             |
+| `server/src/workouts.ts` | `workoutRoutes` plugin: the 5 `/api/v1/workouts` routes (see [Workouts](#workouts)).                                                                                                                                                                                                                                                         |
+| `server/src/foods.ts`    | `foodRoutes` plugin: the 5 `/api/v1/foods` routes (see [Foods](#foods)).                                                                                                                                                                                                                                                                     |
+| `server/src/routes.ts`   | Helpers shared by the resource plugins: `ID_PARAMS_SCHEMA` (`:id` must be a UUID), `parseDateRange(query, defaultDays)` (validates `from` / `to` and returns the Prisma `date` filter) and `toISODate(date)` (`Date` to `yyyy-mm-dd`).                                                                                                       |
+| `server/src/db.ts`       | `createDb(databaseUrl)` returns a `PrismaClient` that uses the `@prisma/adapter-pg` driver adapter. It also declares the `app.db` type on `FastifyInstance`.                                                                                                                                                                                 |
+| `server/src/server.ts`   | Entry point. Parses `process.env`, builds the app and listens on `127.0.0.1:<PORT>`.                                                                                                                                                                                                                                                         |
+| `server/src/test/db.ts`  | Test helpers: `TEST_ENV` (an `Env` pointing at `ironlog_test`) and `truncateTables(db)`.                                                                                                                                                                                                                                                     |
 
 Tests call `buildApp()` and use `app.inject()`, so no port is opened.
 
@@ -214,8 +216,8 @@ with the prefix `/api/v1/workouts` (reference in [`api.md`](./api.md#workouts)).
 - **Auth and scoping.** The plugin adds `app.requireAuth` as a `preHandler` hook, so every route
   in it requires a session. Every query filters by `request.userId`; another user's workout is
   not found and returns 404 `Workout not found`.
-- **Validation.** `:id` is checked with `z.uuid()` and `from` / `to` with `ISODateSchema`. Bodies
-  are parsed with `WorkoutSchema` from `shared/` with `id` removed from the workout and from each
+- **Validation.** `:id` and `from` / `to` are checked with the helpers in `server/src/routes.ts`
+  (`z.uuid()` and `ISODateSchema`). Bodies are parsed with `WorkoutSchema` from `shared/` with `id` removed from the workout and from each
   exercise (`WORKOUT_INPUT_SCHEMA`); Zod strips unknown keys, so client ids are ignored and the
   database generates them. A `ZodError` becomes 400 in the global error handler.
 - **Order.** Exercises and sets get `position` from their index in the request (starting at 0)
@@ -224,7 +226,7 @@ with the prefix `/api/v1/workouts` (reference in [`api.md`](./api.md#workouts)).
   `yyyy-mm-dd`, `weight` (`Decimal`) becomes a number with `.toNumber()`, and null
   `durationMin` / `notes` are left out.
 - **List.** Ordered by `date` desc, then `createdAt` desc. `from` defaults to 90 days before the
-  current UTC day (`DEFAULT_RANGE_DAYS`); `to` has no default.
+  current UTC day (`DEFAULT_RANGE_DAYS`, passed to `parseDateRange()`); `to` has no default.
 - **Create.** One nested `workout.create` writes the workout, exercises and sets atomically.
 - **Replace (PUT).** Inside `app.db.$transaction`, it checks that the workout belongs to the user,
   deletes all of its `Exercise` rows (their sets go by cascade) and updates the workout with the
@@ -233,6 +235,27 @@ with the prefix `/api/v1/workouts` (reference in [`api.md`](./api.md#workouts)).
   fails, nothing changes.
 - **Delete.** `deleteMany` with `id` and `userId`; a count of 0 returns 404. Exercises and sets go
   by cascade.
+
+## Foods
+
+`server/src/foods.ts` exports `foodRoutes`, a Fastify plugin that `buildApp()` registers with the
+prefix `/api/v1/foods` (reference in [`api.md`](./api.md#foods)).
+
+- **Auth and scoping.** The plugin adds `app.requireAuth` as a `preHandler` hook. Every query
+  filters by `request.userId`; another user's entry returns 404 `Food entry not found`.
+- **Validation.** Bodies are parsed with `FoodEntrySchema` from `shared/` without `id`
+  (`FOOD_INPUT_SCHEMA`), so `meal` must be one of `MEALS` and the database generates the id.
+  `:id` and `from` / `to` use the helpers in `server/src/routes.ts`. `limit` on `/recent` is
+  coerced to an integer 1–50 (default 20).
+- **Response mapping.** `toFoodEntry()` turns a row into the shared `FoodEntry` shape, with
+  `date` as `yyyy-mm-dd`.
+- **List.** Ordered by `date` desc, then `createdAt` desc. `from` defaults to 30 days before the
+  current UTC day (`DEFAULT_RANGE_DAYS`); `to` has no default.
+- **Recent.** `GET /recent` is registered before the `/:id` routes. It reads the user's entries
+  ordered by `createdAt` desc (then `id` desc) in batches of 100 (`RECENT_BATCH_SIZE`) and keeps
+  the first entry for each lowercased name until it has `limit` names or runs out of rows.
+- **Replace (PUT) and delete.** `updateMany` / `deleteMany` with `id` and `userId`; a count of 0
+  returns 404. PUT returns the parsed body with the path `id`.
 
 ## Error handling
 
@@ -255,4 +278,4 @@ response outside `development`.
 Route handlers throw `app.httpErrors.<name>(detail)` for expected failures (for example
 `app.httpErrors.conflict('Email already registered')`) and let the global handler format them.
 
-_Last updated by TB04._
+_Last updated by TB05._

@@ -49,6 +49,7 @@ npm --prefix server run test:coverage  # run with coverage and thresholds
 | `server/src/db.test.ts`       | CRUD for every model; unique lowercase email; one `Goals` per user; exercise and set order by `position`; `Decimal` kg/cm values; one health entry per user per day; cascade delete from `Workout` and from `User`.                                                                                                                                                                                                                  |
 | `server/src/auth.test.ts`     | Register, login, logout, me and account deletion: success paths and cookie flags; 400 invalid input; 401 wrong password, unknown email, non-argon2 hash and missing/expired/tampered/foreign-secret token; Bearer header ignored; 409 duplicate; 403 foreign or `null` Origin; 429 after 10 requests; account deletion removes only that user's rows; password and hash absent from responses and logs.                              |
 | `server/src/workouts.test.ts` | Create, list, get, replace and delete: nested exercises and sets in order, empty optional fields omitted; inclusive `from`/`to` filter newest first; default last 90 days (fixed clock); PUT with fewer exercises removes the dropped ones; delete removes exercises and sets; 400 invalid body, date filter and malformed id; 401 without a session; 404 unknown id; cross-user 404 that leaves the other user's workout unchanged. |
+| `server/src/foods.test.ts`    | Create, list, recent, replace and delete: inclusive `from`/`to` filter newest first; default last 30 days (fixed clock); `recent` de-duplicated case-insensitively, newest first, respects `limit` (default 20) and reads past a batch of 100 duplicates; 400 invalid body, date filter, `limit` and malformed id; 401 without a session; 404 unknown id; cross-user 404 that leaves the other user's entry unchanged.               |
 
 ### Test database
 
@@ -63,7 +64,8 @@ npm --prefix server run test:coverage  # run with coverage and thresholds
 has a known host. It captures logs by passing a stream to `buildApp(TEST_ENV, { write })`, and
 fakes only `Date` (`vi.useFakeTimers({ toFake: ['Date'] })`) to expire a token.
 `workouts.test.ts` truncates before each test, signs sessions with `app.jwt.sign()` and fakes
-only `Date` the same way to test the default 90-day range.
+only `Date` the same way to test the default 90-day range. `foods.test.ts` does the same for the
+default 30-day range, and seeds `FoodEntry` rows with fixed `createdAt` values for `recent`.
 
 A test file that uses the database calls `truncateTables(app.db)` before its tests and
 `app.close()` after them, which disconnects the client. `db.test.ts` also truncates before each
@@ -78,4 +80,4 @@ Coverage measures `server/src/**/*.ts` except test files, `src/server.ts` (the e
 the generated Prisma client (`src/generated/**`),
 with thresholds of 90 % lines and 85 % branches. Reports go to `server/coverage/` (git-ignored).
 
-_Last updated by TB04._
+_Last updated by TB05._
