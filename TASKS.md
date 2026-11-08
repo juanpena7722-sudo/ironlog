@@ -202,7 +202,7 @@ and is scoped to the current user; another user's resource returns 404.
 
 1. Tests: health 200; 404, 400 and 500 return Problem Details; 500 hides internals in production; env rejects a short `JWT_SECRET`.
 
-### [ ] TB02 — Database schema and migrations
+### [?] TB02 — Database schema and migrations
 
 **Branch:** `feat/tb02-db-schema`
 

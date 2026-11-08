@@ -2,13 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { buildApp } from './app.js'
 import type { Env } from './env.js'
-
-const TEST_ENV: Env = {
-  NODE_ENV: 'test',
-  PORT: 3000,
-  DATABASE_URL: 'postgresql://ironlog:ironlog@localhost:5432/ironlog_test',
-  JWT_SECRET: 'a'.repeat(32),
-}
+import { TEST_ENV } from './test/db.js'
 
 const INTERNAL_MESSAGE = 'relation "users" does not exist'
 

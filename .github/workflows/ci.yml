@@ -65,6 +65,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run db:migrate:test
       - run: npm run test:coverage
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
