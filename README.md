@@ -28,7 +28,7 @@ npm run test:coverage  # tests with coverage thresholds enforced
 
 Data shapes are defined once as Zod schemas in `shared/schemas.ts` (imported via the
 `@shared/*` alias); `src/types.ts` re-exports the inferred types. CI
-(`.github/workflows/ci.yml`) runs lint, format check, typecheck, coverage and build on every
-push and pull request.
+(`.github/workflows/ci.yml`) runs lint, format check, typecheck, coverage, build and
+`npm audit` on every push and pull request.
 
 Built with Vite, React, TypeScript and Recharts.
