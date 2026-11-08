@@ -220,7 +220,7 @@ and is scoped to the current user; another user's resource returns 404.
 1. Migrations create the schema from scratch and are committed.
 2. Tests: CRUD per model, cascade delete, one health entry per day.
 
-### [ ] TB03 — Authentication
+### [?] TB03 — Authentication
 
 **Branch:** `feat/tb03-auth`
 
