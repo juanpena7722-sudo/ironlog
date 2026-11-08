@@ -50,7 +50,7 @@ export default function Health() {
   const existing = data.health.find((h) => h.date === date)
   const [form, setForm] = useState<Form>(() => toForm(date, existing))
 
-  // Load that day's entry into the form whenever the date changes.
+  // Reset the form only when the date changes, not on every data update.
   useEffect(() => {
     setForm(
       toForm(

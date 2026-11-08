@@ -97,7 +97,6 @@ export default function Workouts() {
     return weeks.map((w) => ({ ...w, label: fmtDate(w.week) }))
   }, [data.workouts])
 
-  // ---- draft editing helpers ----
   const patch = (fn: (w: Workout) => Workout) => setDraft((d) => (d ? fn(d) : d))
   const patchEx = (id: string, fn: (e: ExerciseEntry) => ExerciseEntry) =>
     patch((w) => ({ ...w, exercises: w.exercises.map((e) => (e.id === id ? fn(e) : e)) }))

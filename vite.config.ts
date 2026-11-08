@@ -2,7 +2,6 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -14,9 +13,8 @@ export default defineConfig({
     include: ['shared/**/*.test.ts', 'src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html', 'lcov'],
-      // Only code that has tests is measured for now; FE-01 adds src/utils.ts and the
-      // rest of the frontend once its test harness exists.
+      reporter: ['text', 'html'],
+      // Widened to src/ in TF01, when the frontend test harness exists.
       include: ['shared/**/*.ts'],
       exclude: ['**/*.test.ts'],
       thresholds: {

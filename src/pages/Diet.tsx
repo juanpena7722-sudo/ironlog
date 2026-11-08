@@ -42,7 +42,6 @@ export default function Diet() {
   const dayEntries = useMemo(() => data.foods.filter((f) => f.date === date), [data.foods, date])
   const t = totals(dayEntries)
 
-  // Unique recent foods for quick re-adding (most recent first).
   const recent = useMemo(() => {
     const seen = new Map<string, FoodEntry>()
     ;[...data.foods].reverse().forEach((f) => {
@@ -61,7 +60,6 @@ export default function Diet() {
     [data.foods],
   )
 
-  // Auto-estimate calories from macros when calories is left blank.
   const macroKcal =
     (num(form.protein) ?? 0) * 4 + (num(form.carbs) ?? 0) * 4 + (num(form.fat) ?? 0) * 9
 

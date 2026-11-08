@@ -31,7 +31,6 @@ export default function Dashboard() {
   const weekVolume = thisWeek.reduce((s, w) => s + workoutVolume(w), 0)
   const recentWorkouts = [...data.workouts].sort(byDateDesc).slice(0, 4)
 
-  // Muscle groups hit this week, by number of sets.
   const muscleSets = useMemo(() => {
     const m = new Map<string, number>()
     thisWeek.forEach((w) =>

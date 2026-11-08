@@ -72,7 +72,7 @@ export function makeDemoData(): AppData {
   let session = 0
   for (let d = 59; d >= 0; d--) {
     const date = daysAgo(d)
-    const progress = (59 - d) / 59 // 0 → 1 across the 60 days
+    const progress = (59 - d) / 59
 
     // Train 5 days out of every 7.
     if (d % 7 !== 3 && d % 7 !== 6) {

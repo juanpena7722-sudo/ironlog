@@ -76,7 +76,6 @@ export function PageHead({ title, sub }: { title: string; sub?: string }) {
   )
 }
 
-/** Shared recharts styling so all charts look alike. */
 export const chart = {
   grid: 'var(--border)',
   axis: { fontSize: 12, fill: 'var(--muted)' },

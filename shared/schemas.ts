@@ -19,12 +19,11 @@ export const MUSCLES = [
 
 export const NAME_MAX = 100
 export const NOTES_MAX = 2000
-export const REPS_MAX = 1000
-export const WEIGHT_MAX = 2000
+const REPS_MAX = 1000
+const WEIGHT_MAX = 2000
 
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
-/** True when `value` is `yyyy-mm-dd` and names a day that exists on the calendar. */
 export function isRealISODate(value: string): boolean {
   const match = ISO_DATE_PATTERN.exec(value)
   if (!match) return false
@@ -133,6 +132,5 @@ export type Meal = z.infer<typeof MealSchema>
 export type FoodEntry = z.infer<typeof FoodEntrySchema>
 export type BodyEntry = z.infer<typeof BodyEntrySchema>
 export type HealthEntry = z.infer<typeof HealthEntrySchema>
-export type Unit = z.infer<typeof UnitSchema>
 export type Goals = z.infer<typeof GoalsSchema>
 export type AppData = z.infer<typeof AppDataSchema>
