@@ -78,6 +78,16 @@ export interface AppData {
 }
 
 export const MUSCLES = [
-  'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quads',
-  'Hamstrings', 'Glutes', 'Calves', 'Abs', 'Forearms', 'Full body',
+  'Chest',
+  'Back',
+  'Shoulders',
+  'Biceps',
+  'Triceps',
+  'Quads',
+  'Hamstrings',
+  'Glutes',
+  'Calves',
+  'Abs',
+  'Forearms',
+  'Full body',
 ] as const

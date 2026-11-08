@@ -3,6 +3,7 @@
 A web app for bodybuilders to track workouts, diet, body progress and health.
 
 ## Features
+
 - **Dashboard:** today's macros vs targets, bodyweight trend, sets per muscle group this week, recent sessions
 - **Workouts:** log sets, weight and reps; repeat or edit past sessions; estimated-1RM personal records; weekly volume
 - **Diet:** per-meal food log, calories from macros, quick re-add, 14-day calorie chart
@@ -13,6 +14,7 @@ A web app for bodybuilders to track workouts, diet, body progress and health.
 All data is stored locally in the browser (localStorage).
 
 ## Development
+
 ```bash
 npm install
 npm run dev     # start dev server

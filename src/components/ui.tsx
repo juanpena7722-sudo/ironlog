@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react'
 
-export function Card({ title, action, children, className = '' }: {
+export function Card({
+  title,
+  action,
+  children,
+  className = '',
+}: {
   title?: string
   action?: ReactNode
   children: ReactNode
@@ -29,7 +34,12 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
   )
 }
 
-export function Meter({ label, value, goal, unit = '' }: {
+export function Meter({
+  label,
+  value,
+  goal,
+  unit = '',
+}: {
   label: string
   value: number
   goal: number
@@ -42,7 +52,8 @@ export function Meter({ label, value, goal, unit = '' }: {
       <div className="meter-row">
         <span>{label}</span>
         <span className="muted">
-          <strong className={over ? 'warn' : ''}>{Math.round(value)}</strong> / {goal}{unit}
+          <strong className={over ? 'warn' : ''}>{Math.round(value)}</strong> / {goal}
+          {unit}
         </span>
       </div>
       <div className="meter-track">

@@ -11,15 +11,15 @@ this file disagree, this file wins — flag the conflict instead of guessing.
 All work is done by **exactly two agents** with separate responsibilities. Neither agent
 does the other's job.
 
-| | **Builder Agent** | **Release Agent** (tester + publisher) |
-|---|---|---|
-| Purpose | Implements one task from `TASKS.md` to spec | Verifies the work and ships it to GitHub |
-| Writes feature code | ✅ Yes | ❌ Never |
-| Writes tests | ✅ Unit + integration tests for its own code | ✅ May add missing e2e/regression tests, never edits feature code to make tests pass |
-| Runs tests | ✅ Locally while building (fast feedback) | ✅ The **full** production gate (Section 6) |
-| Commits | ✅ On the task's feature branch, locally | ✅ Only the `TASKS.md` status update + its own test files |
-| Pushes to GitHub | ❌ **Never** | ✅ Only after every gate passes |
-| Opens / merges PR | ❌ | ✅ |
+|                     | **Builder Agent**                            | **Release Agent** (tester + publisher)                                               |
+| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Purpose             | Implements one task from `TASKS.md` to spec  | Verifies the work and ships it to GitHub                                             |
+| Writes feature code | ✅ Yes                                       | ❌ Never                                                                             |
+| Writes tests        | ✅ Unit + integration tests for its own code | ✅ May add missing e2e/regression tests, never edits feature code to make tests pass |
+| Runs tests          | ✅ Locally while building (fast feedback)    | ✅ The **full** production gate (Section 6)                                          |
+| Commits             | ✅ On the task's feature branch, locally     | ✅ Only the `TASKS.md` status update + its own test files                            |
+| Pushes to GitHub    | ❌ **Never**                                 | ✅ Only after every gate passes                                                      |
+| Opens / merges PR   | ❌                                           | ✅                                                                                   |
 
 ### 1.1 Workflow loop
 
@@ -101,6 +101,7 @@ Rules checklist (PRODUCTION_RULES §7): all items ✅
 ## 3. Development Practices
 
 ### 3.1 General
+
 - **TypeScript everywhere**, `strict: true`. No `any` (use `unknown` + narrowing). No `@ts-ignore`;
   `@ts-expect-error` only with a comment explaining why.
 - **Validate at the boundary.** Every HTTP request body/params/query, every env var, and every
@@ -110,13 +111,14 @@ Rules checklist (PRODUCTION_RULES §7): all items ✅
 - Small, focused functions and files (aim < 300 lines per file). Pure logic (calculations,
   formatting, unit conversion) lives in plain functions that are unit-tested, not inside components
   or route handlers.
-- Names describe intent (`estimateOneRepMax`, not `calc`). Comments explain *why*, not *what*.
+- Names describe intent (`estimateOneRepMax`, not `calc`). Comments explain _why_, not _what_.
 - No dead code, no commented-out code, no `console.log` left in committed code
   (backend uses the logger; frontend has none in production).
 - Dates: store calendar days as `yyyy-mm-dd` strings (`ISODate`), timestamps as ISO-8601 UTC.
   Weights are stored in **kg** in the database; convert for display only.
 
 ### 3.2 Security
+
 - Never commit secrets. Config comes from env vars; commit `.env.example`, never `.env`.
 - Passwords hashed with **argon2id**. Never log passwords, tokens, or full request bodies.
 - Auth via short-lived JWT in an **httpOnly, Secure, SameSite=Lax cookie** — never in localStorage.
@@ -128,6 +130,7 @@ Rules checklist (PRODUCTION_RULES §7): all items ✅
 - `npm audit --omit=dev --audit-level=high` must be clean.
 
 ### 3.3 Error handling
+
 - Backend returns errors as `{ "error": { "code": "VALIDATION_ERROR", "message": "...", "details"?: ... } }`
   with correct HTTP status (400 validation, 401 unauthenticated, 403 forbidden, 404 not found,
   409 conflict, 429 rate-limited, 500 unexpected). Never leak stack traces in production.
@@ -135,6 +138,7 @@ Rules checklist (PRODUCTION_RULES §7): all items ✅
   human message and a retry action. Mutations show success/failure feedback.
 
 ### 3.4 Git
+
 - Branch per task (see Section 2). Never commit directly to `main`. Never force-push `main`.
 - Conventional Commits: `feat(api): add workouts CRUD`, `fix(web): …`, `test: …`, `chore: …`,
   `docs: …`, `refactor: …`. Reference the task ID in the body: `Task: BE-03`.
@@ -142,6 +146,7 @@ Rules checklist (PRODUCTION_RULES §7): all items ✅
 - PRs are squash-merged; the squash title is the task ID + title.
 
 ### 3.5 Accessibility & UX (frontend)
+
 - Semantic HTML first (`button`, `label`, `nav`, `main`, headings in order).
 - Every input has a `<label>`; every icon-only control has an `aria-label`.
 - Fully keyboard-operable; visible focus styles; colour contrast WCAG AA.
@@ -149,6 +154,7 @@ Rules checklist (PRODUCTION_RULES §7): all items ✅
 - Respect `prefers-reduced-motion` and `prefers-color-scheme`.
 
 ### 3.6 Performance
+
 - Frontend production bundle: initial JS ≤ 250 KB gzipped; lazy-load route pages.
 - API p95 latency under 200 ms for CRUD on a local DB; list endpoints are paginated or date-bounded.
 - Add DB indexes for every `(userId, date)` lookup.
@@ -184,38 +190,39 @@ ironlog/
 
 ### 4.2 Frontend
 
-| Concern | Technology |
-|---|---|
-| Runtime / build | **Vite 6**, **React 19**, **TypeScript 5.8+** (strict) |
-| Routing | **react-router-dom 6** (existing) |
-| Server state / data fetching | **TanStack Query v5** |
-| Forms & validation | Controlled components + **Zod** schemas from `shared/` |
-| Charts | **Recharts** (existing) |
-| Styling | Existing plain CSS in `src/index.css` with CSS custom properties (design tokens). No new CSS framework. |
-| Unit / component tests | **Vitest** + **@testing-library/react** + **@testing-library/user-event** + **jsdom** |
-| API mocking in tests | **MSW (Mock Service Worker) v2** |
-| End-to-end tests | **Playwright** (Chromium + mobile viewport) |
-| Accessibility tests | **@axe-core/playwright** in e2e |
-| Lint / format | **ESLint 9** (existing flat config) + **Prettier** |
+| Concern                      | Technology                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Runtime / build              | **Vite 6**, **React 19**, **TypeScript 5.8+** (strict)                                                  |
+| Routing                      | **react-router-dom 6** (existing)                                                                       |
+| Server state / data fetching | **TanStack Query v5**                                                                                   |
+| Forms & validation           | Controlled components + **Zod** schemas from `shared/`                                                  |
+| Charts                       | **Recharts** (existing)                                                                                 |
+| Styling                      | Existing plain CSS in `src/index.css` with CSS custom properties (design tokens). No new CSS framework. |
+| Unit / component tests       | **Vitest** + **@testing-library/react** + **@testing-library/user-event** + **jsdom**                   |
+| API mocking in tests         | **MSW (Mock Service Worker) v2**                                                                        |
+| End-to-end tests             | **Playwright** (Chromium + mobile viewport)                                                             |
+| Accessibility tests          | **@axe-core/playwright** in e2e                                                                         |
+| Lint / format                | **ESLint 9** (existing flat config) + **Prettier**                                                      |
 
 ### 4.3 Backend
 
-| Concern | Technology |
-|---|---|
-| Runtime | **Node.js 26 LTS** (ESM) |
-| HTTP framework | **Fastify 5** |
-| Validation | **Zod** via `fastify-type-provider-zod` |
-| Database | **PostgreSQL 16** (Docker in dev/test) |
-| ORM / migrations | **Prisma** (`prisma migrate`) |
-| Auth | `@fastify/jwt` + `@fastify/cookie`, **argon2** (argon2id) password hashing |
-| Security | `@fastify/helmet`, `@fastify/cors`, `@fastify/rate-limit` |
-| Logging | **pino** (Fastify built-in), JSON in production, redaction of auth headers/cookies |
-| API docs | `@fastify/swagger` + `@fastify/swagger-ui` at `/docs` (dev only) |
-| Dev runner / build | **tsx** (dev watch), **tsup** (production bundle) |
-| Tests | **Vitest** + Fastify `app.inject()` against a real Postgres test database |
-| Lint / format | ESLint 9 + typescript-eslint + Prettier |
+| Concern            | Technology                                                                         |
+| ------------------ | ---------------------------------------------------------------------------------- |
+| Runtime            | **Node.js 26 LTS** (ESM)                                                           |
+| HTTP framework     | **Fastify 5**                                                                      |
+| Validation         | **Zod** via `fastify-type-provider-zod`                                            |
+| Database           | **PostgreSQL 16** (Docker in dev/test)                                             |
+| ORM / migrations   | **Prisma** (`prisma migrate`)                                                      |
+| Auth               | `@fastify/jwt` + `@fastify/cookie`, **argon2** (argon2id) password hashing         |
+| Security           | `@fastify/helmet`, `@fastify/cors`, `@fastify/rate-limit`                          |
+| Logging            | **pino** (Fastify built-in), JSON in production, redaction of auth headers/cookies |
+| API docs           | `@fastify/swagger` + `@fastify/swagger-ui` at `/docs` (dev only)                   |
+| Dev runner / build | **tsx** (dev watch), **tsup** (production bundle)                                  |
+| Tests              | **Vitest** + Fastify `app.inject()` against a real Postgres test database          |
+| Lint / format      | ESLint 9 + typescript-eslint + Prettier                                            |
 
 ### 4.4 Tooling / CI
+
 - **GitHub Actions** (`.github/workflows/ci.yml`) runs on every push and PR: install → lint →
   typecheck → unit/integration tests with coverage → build → e2e → audit. Postgres runs as a
   service container.
@@ -228,15 +235,16 @@ ironlog/
 
 ### 5.1 Test types (all required where applicable)
 
-| Type | Scope | Where | Tool |
-|---|---|---|---|
-| Unit | Pure functions (utils, calculations, unit conversion, schema parsing) | next to the code: `*.test.ts` | Vitest |
-| Component | A page/component renders and reacts to user input, with API mocked | `src/**/*.test.tsx` | Vitest + RTL + MSW |
+| Type            | Scope                                                                                    | Where                            | Tool                              |
+| --------------- | ---------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
+| Unit            | Pure functions (utils, calculations, unit conversion, schema parsing)                    | next to the code: `*.test.ts`    | Vitest                            |
+| Component       | A page/component renders and reacts to user input, with API mocked                       | `src/**/*.test.tsx`              | Vitest + RTL + MSW                |
 | API integration | Each endpoint: success, validation failure, unauthenticated, other user's data (403/404) | `server/src/routes/**/*.test.ts` | Vitest + `app.inject()` + test DB |
-| End-to-end | Critical user journeys through real frontend + real backend | `e2e/*.spec.ts` | Playwright |
-| Accessibility | No serious/critical axe violations on every page | `e2e/a11y.spec.ts` | axe-core |
+| End-to-end      | Critical user journeys through real frontend + real backend                              | `e2e/*.spec.ts`                  | Playwright                        |
+| Accessibility   | No serious/critical axe violations on every page                                         | `e2e/a11y.spec.ts`               | axe-core                          |
 
 ### 5.2 Rules
+
 - Every acceptance criterion in a task maps to at least one test. Name tests after the behaviour:
   `it('rejects a set with negative reps')`.
 - Every bug fix includes a regression test that fails before the fix.
@@ -249,6 +257,7 @@ ironlog/
   - Overall frontend and backend: **≥ 80 % lines, ≥ 75 % branches**
 
 ### 5.3 Critical e2e journeys (must always pass before production)
+
 1. Register → log in → land on Dashboard.
 2. Log a workout with 2 exercises and 3 sets each → it appears in history → PR is shown.
 3. Add foods to two meals → Dashboard macros update.

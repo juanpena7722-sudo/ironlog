@@ -17,11 +17,15 @@ export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const latestWeight = [...data.body].sort(byDateAsc).at(-1)?.weight
-  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  const flash = (m: string) => {
+    setMsg(m)
+    setTimeout(() => setMsg(''), 3000)
+  }
 
   const field = (k: keyof Goals) => ({
     value: goals[k] as number,
-    onChange: (e: ChangeEvent<HTMLInputElement>) => setLocal({ ...goals, [k]: Number(e.target.value) || 0 }),
+    onChange: (e: ChangeEvent<HTMLInputElement>) =>
+      setLocal({ ...goals, [k]: Number(e.target.value) || 0 }),
   })
 
   const save = (e: FormEvent) => {
@@ -97,26 +101,50 @@ export default function Settings() {
             <div className="form-grid">
               <label>
                 Units
-                <select value={goals.unit} onChange={(e) => setLocal({ ...goals, unit: e.target.value as Goals['unit'] })}>
+                <select
+                  value={goals.unit}
+                  onChange={(e) => setLocal({ ...goals, unit: e.target.value as Goals['unit'] })}
+                >
                   <option value="kg">kg / cm</option>
                   <option value="lb">lb / in</option>
                 </select>
               </label>
-              <label>Target weight ({goals.unit}) <input type="number" step={0.1} {...field('targetWeight')} /></label>
-              <label>Calories (kcal) <input type="number" {...field('calories')} /></label>
-              <label>Protein (g) <input type="number" {...field('protein')} /></label>
-              <label>Carbs (g) <input type="number" {...field('carbs')} /></label>
-              <label>Fat (g) <input type="number" {...field('fat')} /></label>
-              <label>Water (L) <input type="number" step={0.25} {...field('waterL')} /></label>
-              <label>Sleep (h) <input type="number" step={0.25} {...field('sleepHours')} /></label>
+              <label>
+                Target weight ({goals.unit}){' '}
+                <input type="number" step={0.1} {...field('targetWeight')} />
+              </label>
+              <label>
+                Calories (kcal) <input type="number" {...field('calories')} />
+              </label>
+              <label>
+                Protein (g) <input type="number" {...field('protein')} />
+              </label>
+              <label>
+                Carbs (g) <input type="number" {...field('carbs')} />
+              </label>
+              <label>
+                Fat (g) <input type="number" {...field('fat')} />
+              </label>
+              <label>
+                Water (L) <input type="number" step={0.25} {...field('waterL')} />
+              </label>
+              <label>
+                Sleep (h) <input type="number" step={0.25} {...field('sleepHours')} />
+              </label>
             </div>
             <p className={`small ${Math.abs(macroKcal - goals.calories) > 100 ? 'warn' : 'muted'}`}>
-              Macros add up to {round(macroKcal, 0)} kcal ({macroKcal >= goals.calories ? '+' : ''}{round(macroKcal - goals.calories, 0)} vs calorie target).
+              Macros add up to {round(macroKcal, 0)} kcal ({macroKcal >= goals.calories ? '+' : ''}
+              {round(macroKcal - goals.calories, 0)} vs calorie target).
             </p>
             <div className="actions">
               <button type="submit">Save targets</button>
-              <button type="button" className="ghost" disabled={!latestWeight} onClick={suggest}
-                title={latestWeight ? '' : 'Log a weigh-in first'}>
+              <button
+                type="button"
+                className="ghost"
+                disabled={!latestWeight}
+                onClick={suggest}
+                title={latestWeight ? '' : 'Log a weigh-in first'}
+              >
                 Suggest macros from bodyweight
               </button>
             </div>
@@ -125,19 +153,35 @@ export default function Settings() {
 
         <Card title="Your data">
           <p className="muted small">
-            Everything is stored in this browser only. Export a backup regularly, especially before clearing site data.
+            Everything is stored in this browser only. Export a backup regularly, especially before
+            clearing site data.
           </p>
           <p className="small">
-            {data.workouts.length} workouts · {data.foods.length} food entries · {data.body.length} check-ins · {data.health.length} health logs
+            {data.workouts.length} workouts · {data.foods.length} food entries · {data.body.length}{' '}
+            check-ins · {data.health.length} health logs
           </p>
           <div className="actions">
-            <button className="ghost" onClick={doExport}>Export backup</button>
-            <button className="ghost" onClick={() => fileRef.current?.click()}>Import backup</button>
-            <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={doImport} />
+            <button className="ghost" onClick={doExport}>
+              Export backup
+            </button>
+            <button className="ghost" onClick={() => fileRef.current?.click()}>
+              Import backup
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={doImport}
+            />
           </div>
           <div className="actions">
-            <button className="ghost" onClick={() => setPending('demo')}>Load demo data</button>
-            <button className="ghost danger" onClick={() => setPending('reset')}>Clear all logs</button>
+            <button className="ghost" onClick={() => setPending('demo')}>
+              Load demo data
+            </button>
+            <button className="ghost danger" onClick={() => setPending('reset')}>
+              Clear all logs
+            </button>
           </div>
           {pending && (
             <div className="confirm">
@@ -148,13 +192,23 @@ export default function Settings() {
                 This can’t be undone.
               </p>
               <div className="actions">
-                <button className="danger-solid" onClick={confirm}>Yes, continue</button>
-                <button className="ghost" onClick={() => setPending(null)}>Cancel</button>
+                <button className="danger-solid" onClick={confirm}>
+                  Yes, continue
+                </button>
+                <button className="ghost" onClick={() => setPending(null)}>
+                  Cancel
+                </button>
               </div>
             </div>
           )}
           {exportText && (
-            <textarea className="export" rows={6} readOnly value={exportText} onFocus={(e) => e.target.select()} />
+            <textarea
+              className="export"
+              rows={6}
+              readOnly
+              value={exportText}
+              onFocus={(e) => e.target.select()}
+            />
           )}
         </Card>
       </div>
