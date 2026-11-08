@@ -253,7 +253,7 @@ and is scoped to the current user; another user's resource returns 404.
 1. Tests: CRUD, date filter, 400, 401, 404, cross-user 404.
 2. A PUT with fewer exercises removes the dropped ones.
 
-### [ ] TB05 — Food log API
+### [?] TB05 — Food log API
 
 **Branch:** `feat/tb05-foods-api`
 

@@ -4,6 +4,7 @@ import sensible from '@fastify/sensible'
 import { ZodError } from 'zod'
 import { registerAuth } from './auth.js'
 import { createDb } from './db.js'
+import { foodRoutes } from './foods.js'
 import type { Env } from './env.js'
 import { workoutRoutes } from './workouts.js'
 
@@ -59,6 +60,7 @@ export function buildApp(env: Env, logStream?: { write(message: string): void })
 
   app.get('/api/v1/health', async () => ({ status: 'ok' }))
   app.register(workoutRoutes, { prefix: '/api/v1/workouts' })
+  app.register(foodRoutes, { prefix: '/api/v1/foods' })
 
   return app
 }

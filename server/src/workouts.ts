@@ -1,23 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import {
-  ExerciseEntrySchema,
-  ISODateSchema,
-  WorkoutSchema,
-  type Workout,
-} from '../../shared/schemas.js'
+import { ExerciseEntrySchema, WorkoutSchema, type Workout } from '../../shared/schemas.js'
 import type { Prisma } from './generated/prisma/client.js'
+import { ID_PARAMS_SCHEMA, parseDateRange, toISODate } from './routes.js'
 
 const DEFAULT_RANGE_DAYS = 90
-const DAY_MS = 24 * 60 * 60 * 1000
 
 const WORKOUT_INPUT_SCHEMA = WorkoutSchema.omit({ id: true }).extend({
   exercises: z.array(ExerciseEntrySchema.omit({ id: true })),
-})
-const ID_PARAMS_SCHEMA = z.object({ id: z.uuid() })
-const LIST_QUERY_SCHEMA = z.object({
-  from: ISODateSchema.optional(),
-  to: ISODateSchema.optional(),
 })
 
 const WORKOUT_INCLUDE = {
@@ -33,7 +23,7 @@ type WorkoutInput = z.infer<typeof WORKOUT_INPUT_SCHEMA>
 function toWorkout(row: WorkoutRow): Workout {
   return {
     id: row.id,
-    date: row.date.toISOString().slice(0, 10),
+    date: toISODate(row.date),
     name: row.name,
     durationMin: row.durationMin ?? undefined,
     notes: row.notes ?? undefined,
@@ -79,15 +69,9 @@ export async function workoutRoutes(app: FastifyInstance) {
   }
 
   app.get('/', async (request) => {
-    const { from, to } = LIST_QUERY_SCHEMA.parse(request.query)
-    const defaultFrom = new Date(Date.now() - DEFAULT_RANGE_DAYS * DAY_MS)
-      .toISOString()
-      .slice(0, 10)
+    const date = parseDateRange(request.query, DEFAULT_RANGE_DAYS)
     const rows = await app.db.workout.findMany({
-      where: {
-        userId: request.userId,
-        date: { gte: new Date(from ?? defaultFrom), lte: to ? new Date(to) : undefined },
-      },
+      where: { userId: request.userId, date },
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       include: WORKOUT_INCLUDE,
     })
