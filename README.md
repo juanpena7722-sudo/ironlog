@@ -17,8 +17,18 @@ All data is stored locally in the browser (localStorage).
 
 ```bash
 npm install
-npm run dev     # start dev server
-npm run build   # type-check and build to dist/
+npm run dev            # start dev server
+npm run build          # type-check and build to dist/
+npm run lint           # ESLint
+npm run format         # format all files with Prettier (format:check to verify only)
+npm run typecheck      # TypeScript project check, including shared/
+npm test               # Vitest unit tests
+npm run test:coverage  # tests with coverage thresholds enforced
 ```
+
+Data shapes are defined once as Zod schemas in `shared/schemas.ts` (imported via the
+`@shared/*` alias); `src/types.ts` re-exports the inferred types. CI
+(`.github/workflows/ci.yml`) runs lint, format check, typecheck, coverage and build on every
+push and pull request.
 
 Built with Vite, React, TypeScript and Recharts.
