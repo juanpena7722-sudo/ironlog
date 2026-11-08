@@ -250,6 +250,23 @@ describe('DELETE /api/v1/auth/account', () => {
     expectProblem(await me(session.value), 401)
   })
 
+  it('rejects the old session on a protected route after deletion', async () => {
+    app.get('/api/v1/protected', { preHandler: app.requireAuth }, async () => ({ ok: true }))
+    const { value } = await registerSession()
+    expect(
+      (await send({ method: 'GET', url: '/api/v1/protected', cookies: { session: value } }))
+        .statusCode,
+    ).toBe(200)
+    expect((await deleteAccount(value, { password: PASSWORD })).statusCode).toBe(204)
+    const response = await send({
+      method: 'GET',
+      url: '/api/v1/protected',
+      cookies: { session: value },
+    })
+    expectProblem(response, 401)
+    expect(response.json().detail).toBe('Not authenticated')
+  })
+
   it('returns 401 for a wrong password and keeps the account', async () => {
     const { value } = await registerSession()
     expectProblem(await deleteAccount(value, { password: 'wrong password!' }), 401)

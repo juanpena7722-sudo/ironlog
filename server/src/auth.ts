@@ -140,6 +140,11 @@ export function registerAuth(app: FastifyInstance, env: Env): void {
     } catch {
       throw app.httpErrors.unauthorized('Not authenticated')
     }
+    const user = await app.db.user.findUnique({
+      where: { id: request.userId },
+      select: { id: true },
+    })
+    if (!user) throw app.httpErrors.unauthorized('Not authenticated')
   })
 
   app.addHook('onRequest', async (request) => {
