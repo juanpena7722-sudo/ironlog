@@ -44,6 +44,14 @@ client to `server/src/generated/prisma` (git-ignored).
 
 The server listens on `http://127.0.0.1:3000` (`GET /api/v1/health` returns `{"status":"ok"}`).
 
+### argon2 and glibc
+
+Password hashing uses the native `argon2` package, pinned to `^0.41.1` in
+`server/package.json`. It loads a prebuilt binary from `node_modules/argon2/prebuilds/`, so no
+compiler is needed. Releases from 0.42 on need a newer glibc than 2.28, which the development
+machine runs, so do not upgrade past 0.41 until every machine that installs the server has a newer
+glibc. Check the version with `ldd --version`.
+
 ### Database (Docker Compose)
 
 `docker-compose.yml` defines one service, `postgres` (`postgres:16`):
@@ -157,4 +165,4 @@ npm audit --omit=dev --audit-level=high
 
 The audit steps fail only on high or critical advisories in production dependencies.
 
-_Last updated by TB02._
+_Last updated by TB03._

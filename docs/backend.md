@@ -9,20 +9,32 @@ ignores `server/`; root Prettier formats it.
 
 ## Modules
 
-| File                    | Purpose                                                                                                                                                                      |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/src/env.ts`     | `parseEnv(source)` validates environment variables with Zod and returns a typed `Env`. It throws on invalid input.                                                           |
-| `server/src/app.ts`     | `buildApp(env)` creates the Fastify instance: registers `@fastify/sensible`, decorates `app.db`, adds the 404 and global error handlers, and the routes. It does not listen. |
-| `server/src/db.ts`      | `createDb(databaseUrl)` returns a `PrismaClient` that uses the `@prisma/adapter-pg` driver adapter. It also declares the `app.db` type on `FastifyInstance`.                 |
-| `server/src/server.ts`  | Entry point. Parses `process.env`, builds the app and listens on `127.0.0.1:<PORT>`.                                                                                         |
-| `server/src/test/db.ts` | Test helpers: `TEST_ENV` (an `Env` pointing at `ironlog_test`) and `truncateTables(db)`.                                                                                     |
+| File                    | Purpose                                                                                                                                                                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/src/env.ts`     | `parseEnv(source)` validates environment variables with Zod and returns a typed `Env`. It throws on invalid input.                                                                                                                          |
+| `server/src/app.ts`     | `buildApp(env, logStream?)` creates the Fastify instance: configures the logger, registers `@fastify/sensible`, decorates `app.db`, adds the 404 and global error handlers, calls `registerAuth()` and adds the routes. It does not listen. |
+| `server/src/auth.ts`    | `registerAuth(app, env)` registers cookies, JWT, the auth rate limit, `app.requireAuth`, the Origin check and the `/api/v1/auth` routes (see [Authentication](#authentication)).                                                            |
+| `server/src/db.ts`      | `createDb(databaseUrl)` returns a `PrismaClient` that uses the `@prisma/adapter-pg` driver adapter. It also declares the `app.db` type on `FastifyInstance`.                                                                                |
+| `server/src/server.ts`  | Entry point. Parses `process.env`, builds the app and listens on `127.0.0.1:<PORT>`.                                                                                                                                                        |
+| `server/src/test/db.ts` | Test helpers: `TEST_ENV` (an `Env` pointing at `ironlog_test`) and `truncateTables(db)`.                                                                                                                                                    |
 
 Tests call `buildApp()` and use `app.inject()`, so no port is opened.
 
 The server binds to `127.0.0.1` only. It is never exposed publicly; browser traffic reaches it
 through the gateway (PRODUCTION_RULES §3.4).
 
-Logging uses Fastify's built-in pino logger at level `info`, or `silent` when `NODE_ENV=test`.
+Logging uses Fastify's built-in pino logger at level `info`. When `NODE_ENV=test` it is `silent`,
+unless a `logStream` (any object with `write(message)`) is passed to `buildApp()`; then logs at
+`info` go to that stream, which lets tests inspect them.
+
+The logger redacts these paths (the value becomes `[Redacted]`):
+
+| Path                        | Hides                        |
+| --------------------------- | ---------------------------- |
+| `req.headers.authorization` | Bearer or basic credentials  |
+| `req.headers.cookie`        | The `session` cookie         |
+| `res.headers["set-cookie"]` | A newly issued session token |
+| `password`, `*.password`    | Passwords in logged objects  |
 
 ## Database
 
@@ -115,7 +127,68 @@ the process exits with a non-zero code before listening.
 | `DATABASE_URL` | A valid URL (PostgreSQL connection string) | none    |
 | `JWT_SECRET`   | String of at least 32 characters           | none    |
 
-`DATABASE_URL` is passed to `createDb()`. `JWT_SECRET` is validated but not used by any module yet.
+`DATABASE_URL` is passed to `createDb()`. `JWT_SECRET` signs and verifies session tokens (`@fastify/jwt`).
+
+## Authentication
+
+`server/src/auth.ts` implements accounts and sessions with `@fastify/cookie`, `@fastify/jwt`,
+`@fastify/rate-limit` and `argon2`. Routes are under `/api/v1/auth` (reference in
+[`api.md`](./api.md#authentication)).
+
+### Passwords and emails
+
+- Passwords are hashed with argon2id (`argon2.hash(password, { type: argon2id })`, library
+  default cost). Register accepts 10–128 characters; login and account deletion accept 1–128.
+- Emails are trimmed and lowercased before validation, which satisfies the `User_email_lowercase`
+  constraint. A duplicate email (`P2002`) returns 409.
+- Login returns the same 401 `Invalid email or password` for an unknown email and a wrong
+  password. For an unknown email it still runs `argon2.verify` against a dummy hash
+  (`DUMMY_HASH`), so both cases take about the same time. A stored hash that is not a valid
+  argon2 string (such as the seed user's empty `passwordHash`) fails verification with 401.
+- Responses only ever select `id` and `email` (`PUBLIC_USER`); `passwordHash` is never returned.
+
+### Sessions
+
+| Setting   | Value                                                                     |
+| --------- | ------------------------------------------------------------------------- |
+| Token     | JWT, `HS256`, payload `{ sub: <userId> }`, `expiresIn` 7 days             |
+| Secret    | `JWT_SECRET`                                                              |
+| Transport | `session` cookie only (`onlyCookie: true`); Bearer headers ignored        |
+| Cookie    | `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1`, `Max-Age` 7 days |
+| Verify    | Only `HS256` accepted; signature and expiry checked                       |
+
+Sessions are stateless. Logout and account deletion clear the cookie but do not revoke the
+token itself; it stays cryptographically valid until it expires.
+
+### `requireAuth`
+
+`app.requireAuth` is a `preHandler`. It verifies the session cookie and sets `request.userId`
+(the token's `sub`). Any failure (missing, expired, tampered, wrong secret) throws 401
+`Not authenticated`. Use it on every route that needs a user:
+
+```ts
+app.get('/me', { preHandler: app.requireAuth }, async (request) => { /* request.userId */ })
+```
+
+`requireAuth` does not check that the user still exists; `GET /auth/me` and
+`DELETE /auth/account` look the user up and return 401 if it is gone.
+
+### Origin check (CSRF)
+
+A global `onRequest` hook rejects any request whose method is not `GET`, `HEAD` or `OPTIONS`
+when it has an `Origin` header whose host (from `URL.parse`) differs from `request.host`. It
+returns 403 `Cross-origin request rejected`, before body parsing and before any route runs.
+`Origin: null` or an unparseable value is also rejected. Requests without `Origin` pass; the
+`SameSite=Strict` cookie covers them. Together these are the CSRF protection from
+PRODUCTION_RULES §3.4.
+
+### Rate limit
+
+`@fastify/rate-limit` is registered with `global: false`. Each auth route sets
+`config.rateLimit` to 10 requests per minute. The limit is counted per client IP
+(`request.ip`) and per route. The 11th request returns 429 Problem Details
+(`Rate limit exceeded, retry in 1 minute`) with a `Retry-After` header. Other routes have no
+rate limit.
 
 ## Error handling
 
@@ -128,6 +201,7 @@ HTTP status codes are used.
 | A thrown `ZodError`                                                               | 400              | `Invalid input`, plus `errors: [{ path, message }]` (path joined with `.`)   |
 | Unknown route (`setNotFoundHandler`)                                              | 404              | `Route <METHOD> <url> not found`                                             |
 | `app.httpErrors.*` from `@fastify/sensible`, or any error with a 4xx `statusCode` | That status      | The error message                                                            |
+| `@fastify/rate-limit`                                                             | 429              | `Rate limit exceeded, retry in 1 minute`                                     |
 | Any other error (or a 5xx `statusCode`)                                           | 500 (or the 5xx) | The error message in `development`; `An unexpected error occurred` otherwise |
 
 `title` is the standard reason phrase for the status (from `node:http` `STATUS_CODES`). 5xx
@@ -137,4 +211,4 @@ response outside `development`.
 Route handlers throw `app.httpErrors.<name>(detail)` for expected failures (for example
 `app.httpErrors.conflict('Email already registered')`) and let the global handler format them.
 
-_Last updated by TB02._
+_Last updated by TB03._

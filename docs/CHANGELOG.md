@@ -1,5 +1,23 @@
 # Changelog
 
+## TB03 — Authentication (2026-11-08)
+
+- Added: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`,
+  `GET /api/v1/auth/me` and `DELETE /api/v1/auth/account` in `server/src/auth.ts`.
+- Added: register creates the default goals; account deletion removes the user and all of their
+  data.
+- Added: `app.requireAuth` preHandler that sets `request.userId` from the session.
+- Added: dependencies `@fastify/cookie`, `@fastify/jwt`, `@fastify/rate-limit` and `argon2`
+  (`^0.41.1`, see the glibc note in `setup.md`).
+- Changed: `buildApp(env, logStream?)` accepts an optional log stream so tests can read logs.
+- Security: argon2id password hashes; HS256 JWT session (7 days) in an `HttpOnly`, `Secure`,
+  `SameSite=Strict` cookie on `/api/v1`; Bearer headers ignored.
+- Security: login returns one generic 401 for any wrong credential, with a dummy hash check
+  for unknown emails.
+- Security: 403 for state-changing requests with a foreign or `null` `Origin`; auth routes limited
+  to 10 requests/min per IP (429).
+- Security: logs redact `authorization`, `cookie`, `set-cookie` and `password`.
+
 ## TB02 — Database schema and migrations (2026-11-08)
 
 - Added: Prisma 7 with `@prisma/adapter-pg`; models `User`, `Goals`, `Workout`, `Exercise`,
