@@ -161,6 +161,12 @@ describe('GET /foods/recent', () => {
     expect(response.json()).toHaveLength(20)
   })
 
+  it('reads past a batch of 100 duplicates to find older names', async () => {
+    await seedRecent(['Eggs', ...Array.from({ length: 100 }, () => 'Oats')])
+    const response = await send({ method: 'GET', url: `${FOODS_URL}/recent` })
+    expect(response.json().map((food: { name: string }) => food.name)).toEqual(['Oats', 'Eggs'])
+  })
+
   it('returns 400 for an invalid limit', async () => {
     for (const limit of ['0', '51', 'abc']) {
       expectProblem(await send({ method: 'GET', url: `${FOODS_URL}/recent?limit=${limit}` }), 400)
