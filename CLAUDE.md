@@ -1,13 +1,7 @@
-# IronLog — Claude instructions
+# IronLog
 
-- Rules for building, testing and shipping: [`PRODUCTION_RULES.md`](./PRODUCTION_RULES.md) (source of truth).
-- Work backlog, split into Frontend and Backend tasks: [`TASKS.md`](./TASKS.md).
-
-## How to run a task
-
-Use the two agents defined in `.claude/agents/`, in this order, one task at a time:
-
-1. `builder` — implements the next ready task and returns a Handoff Report. Never pushes.
-2. `release` — runs every test and the rules checklist; on failure sends a Failure Report back
-   to `builder`; on success pushes, opens a PR, waits for CI and merges.
-   Repeat the builder ↔ release loop until the task merges (escalate to the human after 3 failed cycles).
+- Rules: [`PRODUCTION_RULES.md`](./PRODUCTION_RULES.md). Tasks: [`TASKS.md`](./TASKS.md). Docs: [`docs/`](./docs/README.md).
+- Start a task only when the owner runs `/code-task <id>` (`tfNN` frontend, `tbNN` backend). Never start, chain or merge tasks on your own.
+- Agent 1 (`builder`) implements; Agent 2 (`release`) tests, documents and opens the PR. The owner authorizes every merge.
+- Change only files the task requires; ask the owner before touching any other file.
+- No AI attribution in code, comments, commits, PRs or docs.

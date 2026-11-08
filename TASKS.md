@@ -1,419 +1,325 @@
-# IronLog — Task Backlog for Claude
+# IronLog — Task Backlog
 
-Every task here is executed under [`PRODUCTION_RULES.md`](./PRODUCTION_RULES.md):
-the **Builder Agent** implements, the **Release Agent** runs the full production gate and
-compliance checklist, then pushes to GitHub and merges. One task at a time.
+Tasks run only when the owner types `/code-task <id>` (e.g. `/code-task tf01`). Rules:
+[`PRODUCTION_RULES.md`](./PRODUCTION_RULES.md). Agent 1 builds; Agent 2 tests, documents and
+opens the PR; **the owner merges**.
 
-**Goal of this backlog:** turn IronLog from a browser-only app (localStorage) into a
-production app with a real backend, user accounts, and a database — without losing any
-existing feature.
+**Goal:** turn IronLog from a browser-only app (localStorage) into a production app with a backend,
+user accounts and a database, keeping every existing feature.
 
 ### Status legend
 
-`[ ]` not started · `[~]` in progress (Builder) · `[?]` in verification (Release Agent) · `[x]` merged to `main` · `[!]` blocked/escalated
+`[ ]` not started · `[~]` building (Agent 1) · `[?]` verifying (Agent 2) · `[x]` verified, PR open/merged · `[!]` blocked
 
-### Execution order
+A task can start only when every task in **Depends on** is merged into `main`.
 
-A task may start only when every task in its **Depends on** is `[x]`.
+| ID   | Task                                           | Depends on                   |
+| ---- | ---------------------------------------------- | ---------------------------- |
+| TF00 | Foundation: tooling, shared schemas, CI        | —                            |
+| TB01 | Server scaffold                                | TF00                         |
+| TB02 | Database schema and migrations                 | TB01                         |
+| TB03 | Authentication                                 | TB02                         |
+| TB04 | Workouts API                                   | TB03                         |
+| TB05 | Food log API                                   | TB03                         |
+| TB06 | Body and health API                            | TB03                         |
+| TB07 | Goals API                                      | TB03                         |
+| TB08 | Backup export/import API                       | TB04, TB05, TB06, TB07       |
+| TB09 | Hardening, gateway and production stack        | TB08                         |
+| TF01 | Frontend test harness and existing-logic tests | TF00                         |
+| TF02 | API client and TanStack Query                  | TF01, TB01                   |
+| TF03 | Auth screens and protected routes              | TF02, TB03                   |
+| TF04 | Data layer on the API (kg canonical)           | TF03, TB04, TB05, TB06, TB07 |
+| TF05 | Backup and local-data migration                | TF04, TB08                   |
+| TF06 | UX states, accessibility, performance          | TF04                         |
+| TF07 | End-to-end and accessibility suite in CI       | TF05, TF06, TB09             |
 
-| #   | Task                                                    | Area     | Depends on                        |
-| --- | ------------------------------------------------------- | -------- | --------------------------------- |
-| 1   | SH-01 Foundation: tooling, shared schemas, CI           | Shared   | —                                 |
-| 2   | BE-01 Server scaffold                                   | Backend  | SH-01                             |
-| 3   | BE-02 Database schema & migrations                      | Backend  | BE-01                             |
-| 4   | BE-03 Authentication                                    | Backend  | BE-02                             |
-| 5   | BE-04 Workouts API                                      | Backend  | BE-03                             |
-| 6   | BE-05 Food log API                                      | Backend  | BE-03                             |
-| 7   | BE-06 Body & Health API                                 | Backend  | BE-03                             |
-| 8   | BE-07 Goals / settings API                              | Backend  | BE-03                             |
-| 9   | BE-08 Backup export / import API                        | Backend  | BE-04, BE-05, BE-06, BE-07        |
-| 10  | BE-09 Hardening, API docs, production image             | Backend  | BE-08                             |
-| 11  | FE-01 Frontend test harness & existing-logic tests      | Frontend | SH-01                             |
-| 12  | FE-02 API client & TanStack Query                       | Frontend | FE-01, BE-01                      |
-| 13  | FE-03 Auth screens & protected routes                   | Frontend | FE-02, BE-03                      |
-| 14  | FE-04 Move data layer to the API (kg canonical)         | Frontend | FE-03, BE-04, BE-05, BE-06, BE-07 |
-| 15  | FE-05 Backup & local-data migration                     | Frontend | FE-04, BE-08                      |
-| 16  | FE-06 UX states, accessibility, responsive, performance | Frontend | FE-04                             |
-| 17  | FE-07 End-to-end & accessibility suite in CI            | Frontend | FE-05, FE-06, BE-09               |
-| 18  | REL-01 Production release v1.0.0                        | Release  | all above                         |
-
-> FE-01 can run in parallel with the BE track **only** in the sense of ordering — the
-> two-agent rule still means one task is active at a time.
+Releases (versioning, tags, deployment) are decided and triggered by the owner only.
 
 ---
 
-## 0. Shared Foundation
+## Frontend Tasks (TF)
 
-### [x] SH-01 — Foundation: tooling, shared schemas, CI
+### [?] TF00 — Foundation: tooling, shared schemas, CI
 
-**Branch:** `chore/SH-01-foundation`
+**Branch:** `chore/SH-01-foundation` (created before the ID scheme; formerly SH-01)
 
 **Spec**
 
-- Add **Prettier** (+ `eslint-config-prettier`) with a `format` and `format:check` script.
-- Add `typecheck` script (`tsc -b --noEmit` or equivalent) to the root `package.json`.
-- Add **Vitest** to the frontend with a `test` and `test:coverage` script; coverage thresholds per
-  PRODUCTION_RULES §5.2.
-- Create `shared/schemas.ts` with **Zod** schemas equivalent to every type in `src/types.ts`
-  (`SetEntry`, `ExerciseEntry`, `Workout`, `FoodEntry`, `BodyEntry`, `HealthEntry`, `Goals`,
-  `AppData`, `MEALS`, `MUSCLES`). Export inferred types.
-- `src/types.ts` re-exports types from `shared/` (no duplicate definitions). Add Vite + tsconfig
-  alias `@shared/*` → `shared/*`.
-- Validation rules: reps integer 0–1000, weight 0–2000, calories/macros ≥ 0, `ISODate` matches
-  `yyyy-mm-dd` and is a real date, `energy` integer 1–5, strings trimmed and length-limited
-  (names ≤ 100, notes ≤ 2000).
-- Add `.github/workflows/ci.yml` running: `npm ci`, lint, format:check, typecheck, test:coverage, build.
-- Add `.env.example` (empty for now) and ensure `.gitignore` covers `.env`, `coverage/`,
-  `playwright-report/`, `test-results/`.
+- Prettier + `eslint-config-prettier`; scripts `format`, `format:check`, `typecheck`, `test`, `test:coverage`.
+- Vitest with coverage thresholds per PRODUCTION_RULES §5.
+- `shared/schemas.ts`: Zod schemas for every type in `src/types.ts`; `src/types.ts` re-exports them.
+  Alias `@shared/*` in Vite and tsconfig.
+- Rules: reps integer 0–1000, weight 0–2000, calories/macros ≥ 0, real `yyyy-mm-dd` dates,
+  energy integer 1–5, trimmed names ≤ 100, notes ≤ 2000.
+- `.github/workflows/ci.yml`: npm ci, lint, format:check, typecheck, test:coverage, build, audit.
+- `.env.example`; `.gitignore` covers `.env`, `coverage/`, `playwright-report/`, `test-results/`.
 
 **Acceptance criteria**
 
-1. `npm run lint`, `format:check`, `typecheck`, `test`, `build` all pass on a clean checkout.
-2. `shared/schemas.test.ts` covers valid and invalid samples for every schema (≥ 90 % coverage).
-3. App still builds and behaves exactly as before (no UI changes).
-4. CI workflow runs on push/PR and passes on GitHub.
+1. All scripts pass on a clean checkout.
+2. `shared/schemas.test.ts` covers valid and invalid cases for every schema (≥ 90 %).
+3. No UI or behaviour change.
+4. CI passes on GitHub.
 
----
+### [ ] TF01 — Frontend test harness and existing-logic tests
 
-## 1. Backend Tasks
-
-All backend code lives in `server/`. All endpoints are under `/api/v1`, return JSON, and use the
-error format from PRODUCTION_RULES §3.3. Every resource endpoint requires auth (from BE-03 on) and
-is scoped to the current user.
-
-### [ ] BE-01 — Server scaffold
-
-**Branch:** `feat/BE-01-server-scaffold`
+**Branch:** `test/tf01-test-harness`
 
 **Spec**
 
-- `server/package.json` (ESM, Node 26), TypeScript strict, ESLint, Prettier, Vitest, tsx, tsup.
-  Scripts: `dev`, `build`, `start`, `lint`, `typecheck`, `test`, `test:coverage`.
-- `src/env.ts`: Zod-parsed env — `NODE_ENV`, `PORT` (default 3000), `DATABASE_URL`,
-  `JWT_SECRET` (min 32 chars), `CORS_ORIGIN`. App refuses to start with invalid env and prints
-  which variable is wrong.
-- `src/app.ts` exports `buildApp(opts)`; `src/server.ts` starts it. Use `fastify-type-provider-zod`.
-- Global error handler producing the standard error shape; Zod errors → 400 `VALIDATION_ERROR`;
-  unknown routes → 404 `NOT_FOUND`; unexpected → 500 `INTERNAL_ERROR` with no stack in production.
-- `GET /api/v1/health` → `200 { status: "ok", version, uptimeSec }`.
-- `docker-compose.yml` at repo root with `postgres:16` and two databases: `ironlog_dev`, `ironlog_test`.
-- Update `server/.env.example` and README "Backend development" section.
-- Add backend jobs to CI (Postgres service container).
-
-**Acceptance criteria**
-
-1. `npm --prefix server run dev` starts the API; `curl /api/v1/health` returns 200.
-2. Tests: health endpoint, 404 shape, validation error shape, 500 shape hides stack in production,
-   env parsing rejects missing/short `JWT_SECRET`.
-3. All backend gate commands pass and CI is green.
-
-### [ ] BE-02 — Database schema & migrations
-
-**Branch:** `feat/BE-02-db-schema`
-
-**Spec**
-
-- Prisma schema for: `User` (id uuid, email unique lowercase, passwordHash, createdAt),
-  `Goals` (1:1 with user, fields from `Goals`), `Workout` → `Exercise` (ordered) → `WorkoutSet` (ordered),
-  `FoodEntry`, `BodyEntry`, `HealthEntry`. All rows have `userId`, `createdAt`, `updatedAt`.
-- Weights (`WorkoutSet.weight`, `BodyEntry.weight`, `Goals.targetWeight`) stored in **kg**
-  (`Decimal(6,2)`); measurements stored in **cm**.
-- Calendar dates stored as Postgres `date`. Indexes on `(userId, date)` for every dated table.
-  `HealthEntry` unique on `(userId, date)`.
-- Cascading delete from `User` and from `Workout` to its exercises/sets.
-- Scripts: `db:migrate` (dev), `db:migrate:test`, `db:reset:test`, `db:seed` (demo user using
-  the data shape from `src/demo.ts`).
-- Prisma client exposed as a Fastify plugin (`app.db`), closed on shutdown.
-- Test helper that truncates all tables between test files.
-
-**Acceptance criteria**
-
-1. `prisma migrate dev` creates the schema from scratch; migration files committed.
-2. Tests: create/read each model; cascade delete removes child rows; unique health-per-day enforced.
-3. Seed script creates a demo user with workouts, foods, body and health entries.
-
-### [ ] BE-03 — Authentication
-
-**Branch:** `feat/BE-03-auth`
-
-**Spec**
-
-- `POST /api/v1/auth/register` `{ email, password }` → 201, sets session cookie, creates default `Goals`.
-  Password: 10–128 chars. Duplicate email → 409 `EMAIL_TAKEN`.
-- `POST /api/v1/auth/login` → 200 + cookie; wrong credentials → 401 `INVALID_CREDENTIALS`
-  (same message for unknown email and wrong password).
-- `POST /api/v1/auth/logout` → 204, clears cookie.
-- `GET /api/v1/auth/me` → `{ id, email }` or 401.
-- JWT (HS256, 7-day expiry) in `httpOnly`, `SameSite=Lax`, `Secure` (in production), `Path=/` cookie.
-- argon2id hashing. `requireAuth` preHandler decorates `request.userId`.
-- Rate limit: 10 requests/min per IP on `register` and `login` → 429.
-- `DELETE /api/v1/auth/account` (requires password) deletes the user and all data.
-
-**Acceptance criteria**
-
-1. Tests for each endpoint: success, validation failure, wrong password, duplicate email,
-   missing/expired/tampered token → 401, rate limit → 429, account deletion removes all rows.
-2. Password hash never appears in any response or log (asserted in a test).
-
-### [ ] BE-04 — Workouts API
-
-**Branch:** `feat/BE-04-workouts-api`
-
-**Spec**
-
-- `GET /api/v1/workouts?from=&to=` (dates inclusive, default last 90 days, sorted date desc)
-- `GET /api/v1/workouts/:id`
-- `POST /api/v1/workouts` — full workout with nested exercises and sets (body = shared `Workout`
-  schema minus `id`), created in one transaction.
-- `PUT /api/v1/workouts/:id` — replaces the workout including exercises/sets (transactional).
-- `DELETE /api/v1/workouts/:id` → 204.
-- Response shape matches the shared `Workout` schema exactly (weights in kg, order preserved).
-
-**Acceptance criteria**
-
-1. Tests: CRUD happy paths, date-range filter, invalid body → 400, unknown id → 404,
-   another user's workout → 404 (no existence leak), unauthenticated → 401.
-2. Updating a workout with fewer exercises removes the dropped ones.
-
-### [ ] BE-05 — Food log API
-
-**Branch:** `feat/BE-05-foods-api`
-
-**Spec**
-
-- `GET /api/v1/foods?from=&to=` (default last 30 days), `POST`, `PUT /:id`, `DELETE /:id`.
-- `GET /api/v1/foods/recent?limit=20` — distinct recent foods by name (for quick re-add).
-- `meal` must be one of `MEALS`.
-
-**Acceptance criteria**
-
-1. Same test matrix as BE-04 (happy, 400, 401, 404, cross-user).
-2. `recent` returns de-duplicated names, most recent first, respecting `limit` (max 50).
-
-### [ ] BE-06 — Body & Health API
-
-**Branch:** `feat/BE-06-body-health-api`
-
-**Spec**
-
-- Body: `GET /api/v1/body?from=&to=`, `POST`, `PUT /:id`, `DELETE /:id` (weight kg, measurements cm).
-- Health: `GET /api/v1/health-entries?from=&to=`, `PUT /api/v1/health-entries/:date` (upsert by date),
-  `DELETE /api/v1/health-entries/:date`.
-
-**Acceptance criteria**
-
-1. Same test matrix as BE-04 for both resources.
-2. Upserting health for an existing date updates it instead of creating a duplicate.
-
-### [ ] BE-07 — Goals / settings API
-
-**Branch:** `feat/BE-07-goals-api`
-
-**Spec**
-
-- `GET /api/v1/goals` and `PUT /api/v1/goals` (full `Goals` object; `targetWeight` in kg;
-  `unit` is the display preference only).
-
-**Acceptance criteria**
-
-1. Tests: defaults returned for a new user, update persists, invalid values → 400, 401 without auth.
-
-### [ ] BE-08 — Backup export / import API
-
-**Branch:** `feat/BE-08-backup-api`
-
-**Spec**
-
-- `GET /api/v1/backup` → full `AppData` (version 1) for the current user, as a download
-  (`Content-Disposition: attachment; filename="ironlog-backup-YYYY-MM-DD.json"`).
-- `POST /api/v1/backup/import?mode=merge|replace` accepts `AppData` v1 (the same format the current
-  localStorage app exports). Validated with the shared schema; body limit 5 MB.
-  - `merge`: insert entries whose `id` does not already exist for the user.
-  - `replace`: delete all user data, then insert — in a single transaction.
-  - `unitHint=kg|lb` query param: if `lb`, convert weights to kg on import (lb ÷ 2.20462) and
-    inches → cm, because legacy local data was stored in the user's display unit.
-- Response: `{ imported: { workouts, foods, body, health }, skipped: {...} }`.
-
-**Acceptance criteria**
-
-1. Round-trip test: export → import into a fresh user → export again → identical data (ignoring ids/timestamps).
-2. Tests: invalid file → 400 with details, `replace` is atomic (forced failure leaves data intact),
-   `merge` skips duplicates, lb→kg conversion correct to 2 decimals, > 5 MB → 413.
-
-### [ ] BE-09 — Hardening, API docs, production image
-
-**Branch:** `feat/BE-09-hardening`
-
-**Spec**
-
-- Register `@fastify/helmet`, `@fastify/cors` (only `CORS_ORIGIN`, credentials true),
-  global rate limit (300/min/IP) in addition to auth limits.
-- pino redaction of `authorization`, `cookie`, `set-cookie`, `password`.
-- OpenAPI via `@fastify/swagger`, UI at `/docs` when `NODE_ENV !== 'production'`.
-- Graceful shutdown on SIGTERM/SIGINT (stop accepting, finish in-flight, close DB).
-- `server/Dockerfile` (multi-stage, non-root user, `node:26-alpine`), runs migrations on start
-  via `prisma migrate deploy`.
-- Optionally serve the built frontend `dist/` as static files from the API in production
-  (`@fastify/static`) so one container serves the whole app.
-
-**Acceptance criteria**
-
-1. Tests: security headers present, disallowed origin rejected, redaction works (log capture),
-   `/docs` 404 in production.
-2. `docker build` succeeds and the container passes `/api/v1/health` against compose Postgres.
-
----
-
-## 2. Frontend Tasks
-
-The frontend is the existing React app in `src/`. Keep the current look and features; the
-change is where data comes from. All data shapes come from `shared/`.
-
-### [ ] FE-01 — Frontend test harness & existing-logic tests
-
-**Branch:** `test/FE-01-test-harness`
-
-**Spec**
-
-- Add `@testing-library/react`, `@testing-library/user-event`, `jsdom`, **MSW v2**; test setup file.
-- Unit tests for every exported function in `src/utils.ts` (dates, week start, totals, e1RM,
-  volume, etc.) with a fixed system time, and for `normalize()` in `src/store.tsx`.
-- Smoke component test per page (renders with demo data, key headings visible).
+- Testing Library, user-event, jsdom, MSW v2; one test setup file.
+- Unit tests for every export of `src/utils.ts` (fixed system time) and `normalize()` in `src/store.tsx`.
+  Add `src/utils.ts` to coverage.
+- One smoke test per page.
 - Lazy-load route pages with `React.lazy` + `Suspense`.
 
 **Acceptance criteria**
 
-1. `src/utils.ts` ≥ 90 % lines / 85 % branches; overall frontend ≥ 80 % lines.
+1. `src/utils.ts` ≥ 90 % lines / 85 % branches.
 2. Each of the 6 pages has a passing smoke test.
-3. Production build splits pages into separate chunks.
+3. The build emits a separate chunk per page.
 
-### [ ] FE-02 — API client & TanStack Query
+### [ ] TF02 — API client and TanStack Query
 
-**Branch:** `feat/FE-02-api-client`
+**Branch:** `feat/tf02-api-client`
 
 **Spec**
 
-- `src/api/client.ts`: typed `fetch` wrapper — base URL from `VITE_API_URL` (default `/api/v1`),
-  `credentials: 'include'`, JSON parse, parses standard error shape into an `ApiError` class
-  (`status`, `code`, `message`), validates responses with shared Zod schemas.
-- Vite dev proxy `/api` → `http://localhost:3000`.
-- `QueryClientProvider` in `main.tsx` with sensible defaults (retry 1 on 5xx only, no retry on 4xx).
-- MSW handlers in `src/test/handlers.ts` mirroring the API contract for component tests.
+- `src/api/client.ts`: `fetch` wrapper with the fixed relative base `/api/v1` (same origin only,
+  no configurable backend URL), `credentials: 'same-origin'`. It parses RFC 9457 Problem Details into
+  `ApiError` (`status`, `title`, `detail`) and validates responses with shared schemas.
+- Vite dev proxy `/api` → `http://localhost:3000` (development stand-in for the gateway).
+- `QueryClientProvider` in `main.tsx`: retry once on 5xx only.
+- MSW handlers in `src/test/handlers.ts`.
 
 **Acceptance criteria**
 
-1. Tests: success parse, error shape → `ApiError`, malformed response → validation error,
-   network failure surfaced, credentials included.
+1. Tests: success parse, Problem Details → `ApiError`, malformed response rejected, network failure surfaced.
 
-### [ ] FE-03 — Auth screens & protected routes
+### [ ] TF03 — Auth screens and protected routes
 
-**Branch:** `feat/FE-03-auth-ui`
+**Branch:** `feat/tf03-auth-ui`
 
 **Spec**
 
-- `/login` and `/register` pages matching the existing visual style; client-side validation with
-  shared schema; server errors shown inline (e.g. "Email already registered").
-- `useSession()` hook backed by `GET /auth/me`. All existing routes require a session; unauthenticated
-  users are redirected to `/login` and returned to the original page after login.
-- Logout button in the nav; "Delete account" in Settings (confirm dialog + password).
+- `/login` and `/register` in the existing style; client validation from shared schemas; server `detail` shown inline.
+- `useSession()` from `GET /auth/me`; unauthenticated users go to `/login`, then return to the original page.
+- Logout in the nav; "Delete account" in Settings (confirm + password).
 
 **Acceptance criteria**
 
-1. Component tests (MSW): successful register/login redirects, invalid input messages,
-   401 on protected route redirects to login, logout clears session and cached queries.
-2. Keyboard-only: forms can be completed and submitted.
+1. Tests: register/login redirect, validation messages, 401 redirects to login, logout clears session and query cache.
+2. Forms are fully keyboard operable.
 
-### [ ] FE-04 — Move data layer to the API (kg canonical)
+### [ ] TF04 — Data layer on the API (kg canonical)
 
-**Branch:** `feat/FE-04-api-data-layer`
+**Branch:** `feat/tf04-api-data-layer`
 
 **Spec**
 
-- Replace localStorage persistence in `src/store.tsx` with TanStack Query hooks per resource
-  (`useWorkouts`, `useFoods`, `useBody`, `useHealth`, `useGoals`) and mutations that invalidate
-  or optimistically update caches. Pages keep the same behaviour and look.
-- **Units:** all data from/to the API is kg/cm. Add `src/units.ts` (`toDisplayWeight`,
-  `fromDisplayWeight`, `toDisplayLength`, `fromDisplayLength`) and use it in every page/input/chart.
-  Switching kg ↔ lb in Settings now converts displayed values instead of relabelling them.
-- Remove `localStorage` as a data store (keep it only for the FE-05 migration check).
+- Replace localStorage persistence in `src/store.tsx` with query hooks (`useWorkouts`, `useFoods`, `useBody`,
+  `useHealth`, `useGoals`) and mutations. Pages keep their behaviour and look.
+- `src/units.ts`: `toDisplayWeight`, `fromDisplayWeight`, `toDisplayLength`, `fromDisplayLength`, used by
+  every page, input and chart. Switching kg ↔ lb converts the values shown.
 
 **Acceptance criteria**
 
-1. Every existing feature in README works against the real API (component tests with MSW for
-   each page: list, create, edit, delete).
-2. `src/units.ts` unit tests ≥ 90 % coverage; round-trip conversion is stable to 0.1.
-3. Test: entering 100 lb saves 45.36 kg; switching to kg displays 45.4.
+1. Every README feature works against the API (component tests per page: list, create, edit, delete).
+2. `src/units.ts` ≥ 90 % coverage; round trip stable to 0.1.
+3. Entering 100 lb saves 45.36 kg; switching to kg shows 45.4.
 
-### [ ] FE-05 — Backup & local-data migration
+### [ ] TF05 — Backup and local-data migration
 
-**Branch:** `feat/FE-05-backup-migration`
+**Branch:** `feat/tf05-backup-migration`
 
 **Spec**
 
-- Settings → Export downloads from `GET /backup`; Import uploads to `POST /backup/import` with
-  merge/replace choice and a confirmation for replace.
-- On first login, if `localStorage['ironlog:data']` has data, show a one-time banner:
-  "Import your existing on-device data into your account?" → calls import with `mode=merge` and
-  `unitHint` = the stored unit. On success remove the local data; on dismiss remember the choice.
-- Demo data button calls the seed/import path instead of writing to localStorage.
+- Settings export/import use `GET /backup` and `POST /backup/import` (merge or replace; replace needs confirmation).
+- If `localStorage['ironlog:data']` holds data after login, offer a one-time import (`mode=merge`,
+  `unitHint` = stored unit). On success, remove the local data; remember a dismissal.
 
 **Acceptance criteria**
 
-1. Component tests: banner appears only with local data, import success clears local data and
-   refreshes queries, import failure keeps local data and shows an error, replace requires confirmation.
+1. Tests: banner only with local data; success clears local data and refreshes; failure keeps local data and
+   shows the error; replace requires confirmation.
 
-### [ ] FE-06 — UX states, accessibility, responsive, performance
+### [ ] TF06 — UX states, accessibility, performance
 
-**Branch:** `feat/FE-06-ux-a11y`
+**Branch:** `feat/tf06-ux-a11y`
 
 **Spec**
 
-- Every page: skeleton/loading state, error state with Retry, empty state with a call to action.
-- Toast feedback for every mutation (success + failure).
-- Accessibility pass per PRODUCTION_RULES §3.5 (labels, aria-labels on icon buttons such as nav
-  emoji icons, focus styles, contrast, heading order).
-- Layout verified at 360 px, 768 px, 1280 px; no horizontal scroll.
-- Initial JS ≤ 250 KB gzipped (report size in Handoff).
+- Every page has loading, error (with retry) and empty states; feedback for every mutation.
+- Accessibility per PRODUCTION_RULES §3.6 (including `aria-label` on the emoji nav icons).
+- Layout checked at 360 / 768 / 1280 px. Initial JS ≤ 250 KB gzipped.
 
 **Acceptance criteria**
 
-1. Component tests for loading, error+retry and empty states on each page.
-2. No serious/critical axe violations (axe run in component tests via `vitest-axe` or deferred to FE-07 e2e).
-3. Bundle size reported and within budget.
+1. Tests for loading, error + retry and empty states on each page.
+2. Bundle size within budget (reported in the Handoff).
 
-### [ ] FE-07 — End-to-end & accessibility suite in CI
+### [ ] TF07 — End-to-end and accessibility suite in CI
 
-**Branch:** `test/FE-07-e2e`
+**Branch:** `test/tf07-e2e`
 
 **Spec**
 
-- Playwright config that starts Postgres (compose/CI service), runs migrations, starts the API and
-  the built frontend, and runs in Chromium desktop + a 390×844 mobile viewport.
-- Implement all 8 critical journeys from PRODUCTION_RULES §5.3 in `e2e/`.
-- `e2e/a11y.spec.ts`: axe on every page, fail on serious/critical.
-- Root script `test:e2e`; add an e2e job to CI uploading the Playwright report on failure.
+- Playwright runs against the production stack from TB09 (gateway → API → Postgres), Chromium desktop
+  plus a 390×844 viewport.
+- All critical journeys from PRODUCTION_RULES §5; `e2e/a11y.spec.ts` runs axe on every page.
+- Script `test:e2e`; a CI job uploads the report on failure.
 
 **Acceptance criteria**
 
 1. All journeys pass locally and in CI, 3 consecutive runs without flakes.
-2. a11y spec passes on all pages.
+2. No serious/critical axe violations.
 
 ---
 
-## 3. Release
+## Backend Tasks (TB)
 
-### [ ] REL-01 — Production release v1.0.0
+All endpoints live under `/api/v1`, return JSON, and report errors as RFC 9457 Problem Details with
+standard HTTP status codes only (PRODUCTION_RULES §3.3). From TB03 on, every resource requires auth
+and is scoped to the current user; another user's resource returns 404.
 
-**Branch:** `chore/REL-01-release`
+### [ ] TB01 — Server scaffold
+
+**Branch:** `feat/tb01-server-scaffold`
 
 **Spec**
 
-- Release Agent runs the complete Production Gate on `main`.
-- Update README: architecture overview, local setup (compose, env, migrations, seed), scripts,
-  deployment with the Docker image, env var reference.
-- `CHANGELOG.md` with v1.0.0 notes; bump versions to `1.0.0`; tag `v1.0.0` and create a GitHub
-  release with `gh release create`.
+- `server/` package (ESM, Node 26, strict TS): ESLint, Prettier, Vitest, tsx, tsup. Scripts `dev`, `build`,
+  `start`, `lint`, `typecheck`, `test`, `test:coverage`.
+- `src/env.ts`: Zod-parsed `NODE_ENV`, `PORT` (3000), `DATABASE_URL`, `JWT_SECRET` (≥ 32 chars). Invalid env stops startup.
+- `src/app.ts` exports `buildApp()`; `src/server.ts` starts it; it listens on the private network only.
+- `@fastify/sensible`; a global error handler emits Problem Details (Zod → 400 with `errors`, unknown route → 404,
+  unexpected → 500 without internals in production).
+- `GET /api/v1/health` → `200 { status: "ok" }`.
+- `docker-compose.yml` with `postgres:16` (databases `ironlog_dev`, `ironlog_test`); `server/.env.example`.
+- Backend steps in CI with a Postgres service.
 
 **Acceptance criteria**
 
-1. Every task above is `[x]`; full gate + CI green on `main`; tag and release exist on GitHub.
+1. Tests: health 200; 404, 400 and 500 return Problem Details; 500 hides internals in production; env rejects a short `JWT_SECRET`.
+
+### [ ] TB02 — Database schema and migrations
+
+**Branch:** `feat/tb02-db-schema`
+
+**Spec**
+
+- Prisma models: `User` (uuid, unique lowercase email, passwordHash), `Goals` (1:1), `Workout` → `Exercise` → `WorkoutSet`
+  (ordered), `FoodEntry`, `BodyEntry`, `HealthEntry`; all with `userId`, `createdAt`, `updatedAt`.
+- Weights in kg as `Decimal(6,2)`, lengths in cm, calendar days as `date`. Index `(userId, date)`;
+  `HealthEntry` unique on `(userId, date)`. Cascade deletes from `User` and `Workout`.
+- Scripts `db:migrate`, `db:migrate:test`, `db:reset:test`, `db:seed` (demo user from `src/demo.ts` data).
+- Prisma plugin (`app.db`) closed on shutdown; a test helper truncates tables between files.
+
+**Acceptance criteria**
+
+1. Migrations create the schema from scratch and are committed.
+2. Tests: CRUD per model, cascade delete, one health entry per day.
+
+### [ ] TB03 — Authentication
+
+**Branch:** `feat/tb03-auth`
+
+**Spec**
+
+- `POST /auth/register` `{ email, password }` (password 10–128) → 201 + session cookie + default goals; duplicate email → 409.
+- `POST /auth/login` → 200 + cookie; any wrong credential → 401 with the same generic detail.
+- `POST /auth/logout` → 204; `GET /auth/me` → `{ id, email }` or 401; `DELETE /auth/account` (password required) → 204, deletes all data.
+- JWT HS256, 7-day expiry, in an httpOnly, Secure, SameSite=Strict cookie. argon2id. A `requireAuth` hook sets `request.userId`.
+- State-changing requests with a foreign `Origin` → 403. Auth routes limited to 10 requests/min per IP → 429.
+
+**Acceptance criteria**
+
+1. Tests: success paths; 400 invalid input; 401 wrong password and missing/expired/tampered token; 409 duplicate;
+   403 foreign Origin; 429 rate limit; account deletion removes all rows.
+2. The password hash never appears in a response or log (asserted).
+
+### [ ] TB04 — Workouts API
+
+**Branch:** `feat/tb04-workouts-api`
+
+**Spec**
+
+- `GET /workouts?from=&to=` (inclusive, default last 90 days, newest first), `GET /workouts/:id`,
+  `POST /workouts` (nested exercises and sets, transactional), `PUT /workouts/:id` (full replace, transactional),
+  `DELETE /workouts/:id` → 204. Responses match the shared `Workout` schema with order preserved.
+
+**Acceptance criteria**
+
+1. Tests: CRUD, date filter, 400, 401, 404, cross-user 404.
+2. A PUT with fewer exercises removes the dropped ones.
+
+### [ ] TB05 — Food log API
+
+**Branch:** `feat/tb05-foods-api`
+
+**Spec**
+
+- `GET /foods?from=&to=` (default last 30 days), `POST`, `PUT /:id`, `DELETE /:id`; `meal` ∈ `MEALS`.
+- `GET /foods/recent?limit=` (default 20, max 50): distinct names, most recent first.
+
+**Acceptance criteria**
+
+1. Same test set as TB04; `recent` is de-duplicated and respects `limit`.
+
+### [ ] TB06 — Body and health API
+
+**Branch:** `feat/tb06-body-health-api`
+
+**Spec**
+
+- Body: `GET /body?from=&to=`, `POST`, `PUT /:id`, `DELETE /:id`.
+- Health: `GET /health-entries?from=&to=`, `PUT /health-entries/:date` (upsert), `DELETE /health-entries/:date`.
+
+**Acceptance criteria**
+
+1. Same test set as TB04 for both resources; an upsert on an existing date updates it.
+
+### [ ] TB07 — Goals API
+
+**Branch:** `feat/tb07-goals-api`
+
+**Spec**
+
+- `GET /goals`, `PUT /goals` (full `Goals`; `targetWeight` in kg; `unit` is the display preference).
+
+**Acceptance criteria**
+
+1. Tests: defaults for a new user, update persists, 400, 401.
+
+### [ ] TB08 — Backup export/import API
+
+**Branch:** `feat/tb08-backup-api`
+
+**Spec**
+
+- `GET /backup` → `AppData` v1 as an attachment `ironlog-backup-YYYY-MM-DD.json`.
+- `POST /backup/import?mode=merge|replace&unitHint=kg|lb` accepts `AppData` v1 (5 MB limit). `merge` inserts new ids;
+  `replace` swaps all data in one transaction; `lb` converts weights to kg and inches to cm.
+- Response: `{ imported: {...}, skipped: {...} }`.
+
+**Acceptance criteria**
+
+1. Round trip: export → import into a new user → export gives identical data (ignoring ids and timestamps).
+2. Tests: invalid file 400, atomic replace, merge skips duplicates, lb→kg to 2 decimals, > 5 MB 413.
+
+### [ ] TB09 — Hardening, gateway and production stack
+
+**Branch:** `feat/tb09-hardening-gateway`
+
+**Spec**
+
+- `@fastify/helmet` (with CSP), global rate limit 300/min/IP, body limits, pino redaction (§3.4),
+  graceful shutdown, OpenAPI at `/docs` outside production only.
+- `server/Dockerfile`: multi-stage, `node:26-alpine`, non-root, runs `prisma migrate deploy` on start.
+- `deploy/Caddyfile`: serves `dist/`, proxies `/api/v1/*` to `api:3000`, SPA fallback, security headers.
+- `docker-compose.prod.yml`: `gateway` (only published port), `api` and `db` on an internal network with no published ports.
+
+**Acceptance criteria**
+
+1. Tests: security headers present, redaction works, `/docs` 404 in production.
+2. With the prod stack up, `/` serves the app and `/api/v1/health` returns 200 through the gateway; the API and DB ports are not reachable from the host.

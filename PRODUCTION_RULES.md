@@ -1,321 +1,315 @@
-# IronLog — Production Rules for Claude
+# IronLog — Production Rules
 
-This file is the **source of truth** for how Claude builds, tests and ships IronLog.
-Every task in [`TASKS.md`](./TASKS.md) is executed under these rules. If a task and
-this file disagree, this file wins — flag the conflict instead of guessing.
+Source of truth for how IronLog is built, tested, documented and shipped. Every task in
+[`TASKS.md`](./TASKS.md) runs under these rules. If a task and this file disagree, this file
+wins: stop and ask the owner.
 
 ---
 
-## 1. Rules of Engagement (two-agent model)
+## 1. Rules of Engagement
 
-All work is done by **exactly two agents** with separate responsibilities. Neither agent
-does the other's job.
+### 1.1 The owner decides
 
-|                     | **Builder Agent**                            | **Release Agent** (tester + publisher)                                               |
-| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Purpose             | Implements one task from `TASKS.md` to spec  | Verifies the work and ships it to GitHub                                             |
-| Writes feature code | ✅ Yes                                       | ❌ Never                                                                             |
-| Writes tests        | ✅ Unit + integration tests for its own code | ✅ May add missing e2e/regression tests, never edits feature code to make tests pass |
-| Runs tests          | ✅ Locally while building (fast feedback)    | ✅ The **full** production gate (Section 6)                                          |
-| Commits             | ✅ On the task's feature branch, locally     | ✅ Only the `TASKS.md` status update + its own test files                            |
-| Pushes to GitHub    | ❌ **Never**                                 | ✅ Only after every gate passes                                                      |
-| Opens / merges PR   | ❌                                           | ✅                                                                                   |
+- **Nothing runs unless the owner asks.** A task starts only when the owner runs
+  `/code-task <id>` (e.g. `/code-task tf01`, `/code-task tb03`). Agents never pick, start, or
+  chain the next task on their own.
+- **Every merge is authorized by the owner.** Agents push branches and open pull requests;
+  they never merge, never push to `main`, never tag or release. All production decisions
+  belong to the owner.
+- **Do exactly what the task asks — nothing more.** No extra features, refactors, files,
+  dependencies or comments beyond the task's spec.
+- **Stay inside the task's files.** Only create or modify files the task names or that its
+  spec necessarily requires. If any other file needs to change, **stop and ask the owner first**.
+- **No AI attribution.** No `Co-Authored-By` trailers, "Generated with…" lines, or AI mentions in
+  code, comments, commits, PRs or docs.
 
-### 1.1 Workflow loop
+### 1.2 Task IDs
+
+| Prefix | Area                             | Example         |
+| ------ | -------------------------------- | --------------- |
+| `TF`   | Frontend (and repo-wide tooling) | `TF01`, `TF12`  |
+| `TB`   | Backend                          | `TB01`, `TB100` |
+
+IDs are case-insensitive in the command (`tf01` = `TF01`).
+
+### 1.3 Two agents
+
+|              | **Agent 1 — Builder**                 | **Agent 2 — Release** (tester, documenter, publisher)                         |
+| ------------ | ------------------------------------- | ----------------------------------------------------------------------------- |
+| Purpose      | Implements the requested task to spec | Proves the task is correct and nothing else broke; documents it; opens the PR |
+| Feature code | ✅ Writes it                          | ❌ Never edits it                                                             |
+| Tests        | ✅ Writes tests for its own code      | ✅ Runs the full suite; may add missing regression tests                      |
+| Docs         | ❌                                    | ✅ Updates `docs/` after all tests pass                                       |
+| Push / PR    | ❌ Never                              | ✅ Pushes the task branch and opens the PR                                    |
+| Merge        | ❌ Never                              | ❌ Never — the owner merges                                                   |
+
+### 1.4 Workflow
 
 ```
- ┌──────────────┐  handoff report   ┌──────────────┐   all gates pass   ┌────────────┐
- │ Builder Agent│ ────────────────▶ │ Release Agent│ ─────────────────▶ │  GitHub    │
- │ (implements) │ ◀──────────────── │ (verifies)   │   push + PR + CI   │  (main)    │
- └──────────────┘  failure report   └──────────────┘                    └────────────┘
+ owner: /code-task tf01
+        │
+        ▼
+ ┌──────────────┐  handoff report  ┌──────────────┐  all tests pass  ┌──────────────┐
+ │   Agent 1    │ ───────────────▶ │   Agent 2    │ ───────────────▶ │ docs + push  │
+ │   Builder    │ ◀─────────────── │   Release    │                  │ + PR opened  │
+ └──────────────┘  failure report  └──────────────┘                  └──────┬───────┘
+                                                                            ▼
+                                                                  owner reviews & merges
 ```
 
-1. **Builder** picks the next task whose dependencies are all `[x]` in `TASKS.md`.
-2. **Builder** creates the branch, implements the task, writes tests, runs the quick checks
-   (`lint`, `typecheck`, `test`) and produces a **Handoff Report** (Section 1.2).
-3. **Release Agent** checks out the branch and runs the **full production gate** (Section 6)
-   and the **rules compliance checklist** (Section 7).
-4. Any failure → Release Agent sends a **Failure Report** back to Builder (exact command,
-   exact output, which rule/criterion failed). Builder fixes. Go to step 3.
-   - After **3 failed cycles on the same task**, stop and escalate to the human.
-5. All green → Release Agent marks the task `[x]` in `TASKS.md`, pushes the branch,
-   opens a PR containing the **Validation Report** (Section 1.3), waits for GitHub
-   Actions CI to pass, then squash-merges into `main`.
-6. One task at a time. A new task does not start until the previous one is merged.
+1. Owner runs `/code-task <id>`. The task's dependencies must be `[x]` on `main`; otherwise stop and report.
+2. **Agent 1** branches from `main`, implements the task, writes its tests, runs the quick checks
+   for the touched package (`lint`, `typecheck`, `test`), commits, and returns a **Handoff Report** (§1.5).
+3. **Agent 2** runs the full **Production Gate** (§6) from a clean checkout, verifies every
+   acceptance criterion against its expected result, confirms **nothing else in the system broke**
+   (whole test suite + build, not only the task's tests), and walks the **Compliance Checklist** (§7).
+4. Any failure → **Failure Report** to Agent 1 (gate, exact command, exact output, what to fix).
+   Agent 1 fixes only that. Back to step 3. After **3 failed cycles**, stop and report to the owner.
+5. All green → Agent 2 updates documentation (§8), sets the task to `[x]` in `TASKS.md`, pushes the
+   branch, opens the PR with the **Validation Report** (§1.6), waits for CI, and reports the PR link
+   to the owner. **Then stops.**
 
-### 1.2 Handoff Report (Builder → Release Agent)
+### 1.5 Handoff Report (Agent 1 → Agent 2)
 
 ```markdown
-## Handoff: <TASK-ID> <title>
+## Handoff: <ID> <title>
 Branch: <branch>
-Summary: <what was built, 2–5 lines>
+Summary: <2–5 lines>
 Files changed: <list>
 Acceptance criteria:
-- [x] AC1 … (how it is met / where it is tested)
-- [x] AC2 …
-Tests added: <files + what they cover>
+- [x] AC1 — <where tested>
+Tests added: <files>
 Local checks: lint ✅ typecheck ✅ test ✅
-Known limitations / follow-ups: <or "none">
+Out-of-scope findings (not changed): <or "none">
 ```
 
-### 1.3 Validation Report (Release Agent → PR body)
+### 1.6 Validation Report (Agent 2 → PR body)
 
 ```markdown
-## Validation: <TASK-ID> <title>
+## Validation: <ID> <title>
 | Gate | Command | Result |
 |---|---|---|
 | Install | npm ci | ✅ |
 | Lint | npm run lint | ✅ |
+| Format | npm run format:check | ✅ |
 | Typecheck | npm run typecheck | ✅ |
-| Unit/Integration | npm test | ✅ N passed |
-| Coverage | npm run test:coverage | ✅ lines X% / branches Y% |
-| E2E | npm run test:e2e | ✅ N passed |
+| Tests (full suite) | npm run test:coverage | ✅ N passed, lines X% |
+| E2E | npm run test:e2e | ✅ / N/A (introduced in <ID>) |
 | Build | npm run build | ✅ |
-| Security audit | npm audit --omit=dev --audit-level=high | ✅ |
-Acceptance criteria: all N verified ✅
-Rules checklist (PRODUCTION_RULES §7): all items ✅
+| Audit | npm audit --omit=dev --audit-level=high | ✅ |
+| CI | GitHub Actions | ✅ |
+Acceptance criteria: N/N met. Regressions: none. Docs updated: <files>.
 ```
 
 ---
 
-## 2. Process of Creation (task lifecycle)
+## 2. Process of Creation
 
-1. **Read** — the task in `TASKS.md`, this file, and the code it touches. Never edit code you
-   have not read.
-2. **Plan** — list files to create/change and the tests that prove each acceptance criterion.
-   If the spec is ambiguous, choose the simplest reading that satisfies the acceptance
-   criteria and note it in the Handoff Report. Ask the human only if the choice is
-   irreversible (data model, public API shape, deleting data).
-3. **Branch** — `git checkout main && git pull && git checkout -b <type>/<TASK-ID>-<slug>`
-   e.g. `feat/BE-03-workouts-api`, `fix/FE-05-empty-states`.
-4. **Test first where practical** — write the failing test for each acceptance criterion,
-   then implement until it passes.
-5. **Implement** — smallest change that meets the spec. No unrelated refactors, no scope creep.
-   Anything extra you notice goes in "follow-ups", not in the diff.
-6. **Self-check** — run `npm run lint && npm run typecheck && npm test` in every package you touched.
-7. **Commit** — Conventional Commits, one logical change per commit (Section 3.4).
-8. **Handoff** — send the Handoff Report to the Release Agent.
+1. **Read** only the task, these rules, and the files the task touches.
+2. **Plan** the smallest change that meets every acceptance criterion. If an ambiguity affects the
+   data model or public API, or deletes data, ask the owner.
+3. **Branch**: `git checkout main && git pull && git checkout -b <type>/<id>-<slug>`
+   (e.g. `feat/tb03-auth`, `test/tf01-test-harness`).
+4. **Test first** for each acceptance criterion, then implement until green.
+5. **Commit**: Conventional Commits, body `Task: <ID>`, no AI attribution.
+6. **Handoff** to Agent 2.
 
 ---
 
 ## 3. Development Practices
 
-### 3.1 General
+### 3.1 Code
 
-- **TypeScript everywhere**, `strict: true`. No `any` (use `unknown` + narrowing). No `@ts-ignore`;
-  `@ts-expect-error` only with a comment explaining why.
-- **Validate at the boundary.** Every HTTP request body/params/query, every env var, and every
-  piece of imported/stored JSON is parsed with **Zod**. Inside the boundary, trust the types.
-- **Single source of truth for data shapes:** Zod schemas live in `shared/` and both frontend
-  and backend import types from them (`z.infer`). Do not hand-duplicate interfaces.
-- Small, focused functions and files (aim < 300 lines per file). Pure logic (calculations,
-  formatting, unit conversion) lives in plain functions that are unit-tested, not inside components
-  or route handlers.
-- Names describe intent (`estimateOneRepMax`, not `calc`). Comments explain _why_, not _what_.
-- No dead code, no commented-out code, no `console.log` left in committed code
-  (backend uses the logger; frontend has none in production).
-- Dates: store calendar days as `yyyy-mm-dd` strings (`ISODate`), timestamps as ISO-8601 UTC.
-  Weights are stored in **kg** in the database; convert for display only.
+- TypeScript `strict`. No `any`, no `@ts-ignore`.
+- **Minimal code.** Reuse existing functions and components before writing new ones. No speculative
+  abstractions, no unused exports, no dead or commented-out code, no `console.log`.
+- **Comments only when the code cannot explain itself** (a non-obvious reason or constraint).
+  No comments that restate the code.
+- Validate every boundary input (HTTP body/params/query, env vars, stored/imported JSON) with
+  **Zod**. Data shapes come from `shared/`; never redefine them.
+- Weights are stored in **kg**, lengths in **cm**; convert for display only. Calendar days are
+  `yyyy-mm-dd`; timestamps are ISO-8601 UTC.
 
-### 3.2 Security
+### 3.2 Naming (standard TypeScript conventions)
 
-- Never commit secrets. Config comes from env vars; commit `.env.example`, never `.env`.
-- Passwords hashed with **argon2id**. Never log passwords, tokens, or full request bodies.
-- Auth via short-lived JWT in an **httpOnly, Secure, SameSite=Lax cookie** — never in localStorage.
-- Every data query is scoped by `userId` from the verified session — a user can never read or
-  modify another user's rows (this must be covered by tests).
-- Use parameterised queries only (Prisma does this; no raw SQL string concatenation).
-- Security headers (`@fastify/helmet`), CORS restricted to the configured frontend origin,
-  rate limiting on auth routes.
-- `npm audit --omit=dev --audit-level=high` must be clean.
+| Kind                                         | Convention                                   | Example                               |
+| -------------------------------------------- | -------------------------------------------- | ------------------------------------- |
+| Variables, functions, object keys            | `camelCase`                                  | `targetWeight`, `estimateOneRepMax()` |
+| Types, interfaces, classes, React components | `PascalCase`                                 | `Workout`, `FoodEntry`, `Dashboard`   |
+| Module-level constants                       | `UPPER_SNAKE_CASE`                           | `STORAGE_KEY`, `MEALS`                |
+| Booleans                                     | `is` / `has` / `can` prefix                  | `isLoading`, `hasSession`             |
+| Component files                              | `PascalCase.tsx`                             | `Workouts.tsx`                        |
+| Other modules                                | `camelCase.ts`                               | `units.ts`, `client.ts`               |
+| Tests                                        | `<file>.test.ts(x)`, e2e `<journey>.spec.ts` | `units.test.ts`                       |
+| Prisma                                       | `PascalCase` models, `camelCase` fields      | `WorkoutSet.weight`                   |
+| URLs                                         | lowercase, plural nouns, kebab-case          | `/api/v1/health-entries`              |
 
-### 3.3 Error handling
+### 3.3 Error handling (standard, no custom error codes)
 
-- Backend returns errors as `{ "error": { "code": "VALIDATION_ERROR", "message": "...", "details"?: ... } }`
-  with correct HTTP status (400 validation, 401 unauthenticated, 403 forbidden, 404 not found,
-  409 conflict, 429 rate-limited, 500 unexpected). Never leak stack traces in production.
-- Frontend: every data-loading view has **loading, error, and empty** states. Errors show a
-  human message and a retry action. Mutations show success/failure feedback.
+- **Do not invent error codes.** Use standard **HTTP status codes** only:
+  400 invalid input, 401 not authenticated, 403 not allowed, 404 not found, 409 conflict,
+  413 payload too large, 429 too many requests, 500 unexpected.
+- Error bodies follow **RFC 9457 Problem Details** (`Content-Type: application/problem+json`):
+  `{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Workout not found" }`.
+  Validation errors may add an `errors` array of `{ path, message }`.
+- The backend throws standard HTTP errors (`@fastify/sensible` `httpErrors`), and one global error
+  handler formats them. Never expose stack traces, SQL or internal messages outside development.
+- The frontend uses one `ApiError` (`status`, `title`, `detail`) parsed from Problem Details, and
+  shows `detail` or a generic message by status. Every data view has loading, error (with retry)
+  and empty states.
 
-### 3.4 Git
+### 3.4 Security
 
-- Branch per task (see Section 2). Never commit directly to `main`. Never force-push `main`.
-- Conventional Commits: `feat(api): add workouts CRUD`, `fix(web): …`, `test: …`, `chore: …`,
-  `docs: …`, `refactor: …`. Reference the task ID in the body: `Task: BE-03`.
-- Do not commit build output (`dist/`), `node_modules/`, `.env`, coverage reports, or Playwright artifacts.
-- PRs are squash-merged; the squash title is the task ID + title.
+- **The frontend never talks to the backend directly.** All browser traffic goes to a single
+  origin: a **reverse proxy (gateway)** serves the static frontend and forwards only `/api/v1/*` to
+  the API on a private network. The API port and the database are never exposed publicly. The
+  frontend never imports server code, never holds secrets, and never knows the API's internal address.
+- Secrets only in env vars; commit `.env.example`, never `.env`.
+- Passwords: **argon2id**. Sessions: JWT in an **httpOnly, Secure, SameSite=Strict** cookie,
+  never in localStorage or other JS-readable storage.
+- Every query is scoped by the authenticated `userId`; cross-user access returns 404 (tested).
+- Prisma parameterised queries only; no string-built SQL.
+- Headers via `@fastify/helmet` (including CSP). CORS disabled (same origin). CSRF protection on
+  state-changing requests (SameSite=Strict plus an `Origin` check).
+- Rate limiting globally and stricter on auth routes; request body size limits.
+- Logs redact `authorization`, `cookie`, `set-cookie` and `password`.
+- Never use `dangerouslySetInnerHTML`.
+- `npm audit --omit=dev --audit-level=high` clean; dependencies pinned via the lockfile.
+- OWASP Top 10 is the review baseline for every backend task.
 
-### 3.5 Accessibility & UX (frontend)
+### 3.5 Git
 
-- Semantic HTML first (`button`, `label`, `nav`, `main`, headings in order).
-- Every input has a `<label>`; every icon-only control has an `aria-label`.
-- Fully keyboard-operable; visible focus styles; colour contrast WCAG AA.
-- Responsive from **360 px** to desktop with no horizontal scroll.
-- Respect `prefers-reduced-motion` and `prefers-color-scheme`.
+- One branch per task, from `main`. Never commit to or push `main`. Never force-push a pushed branch.
+- Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `ci:`, `refactor:`, `style:`),
+  body `Task: <ID>`.
+- Never commit `dist/`, `node_modules/`, `.env`, coverage or test artifacts.
 
-### 3.6 Performance
+### 3.6 Accessibility and performance (frontend)
 
-- Frontend production bundle: initial JS ≤ 250 KB gzipped; lazy-load route pages.
-- API p95 latency under 200 ms for CRUD on a local DB; list endpoints are paginated or date-bounded.
-- Add DB indexes for every `(userId, date)` lookup.
+- Semantic HTML, labelled inputs, `aria-label` on icon-only controls, keyboard operable, WCAG AA contrast.
+- Responsive from 360 px with no horizontal scroll.
+- Initial JS ≤ 250 KB gzipped; route pages lazy-loaded.
+
+### 3.7 Resource budget
+
+- Agents read only the files the task needs; no repo-wide exploration.
+- Agent 1 runs only the touched package's checks; Agent 2 runs the full gate **once** per cycle.
+- No new dependency unless the task requires it and no existing one can do the job.
+- Prefer the smallest diff that satisfies the acceptance criteria.
 
 ---
 
 ## 4. Technologies
 
-Use these. Adding a dependency not on this list requires a one-line justification in the
-Handoff Report (what it does, why existing tools can't, size/maintenance check).
-
-### 4.1 Repository layout
+### 4.1 Layout
 
 ```
 ironlog/
-├── src/                  # Frontend (React app) — existing
-├── e2e/                  # Playwright end-to-end tests
-├── shared/               # Zod schemas + inferred types shared by web and server
-├── server/               # Backend (Fastify API)
-│   ├── src/
-│   │   ├── app.ts        # buildApp() — creates Fastify instance (used by tests)
-│   │   ├── server.ts     # entrypoint: buildApp().listen()
-│   │   ├── env.ts        # Zod-validated env
-│   │   ├── plugins/      # auth, db, error handler, security
-│   │   └── routes/       # one folder per resource: routes + service + tests
-│   ├── prisma/schema.prisma
-│   └── package.json
-├── docker-compose.yml    # Postgres for dev + test
-├── .github/workflows/ci.yml
+├── src/            # Frontend (React)
+├── shared/         # Zod schemas + types used by frontend and backend
+├── server/         # Backend (Fastify API)
+├── e2e/            # Playwright tests
+├── deploy/         # Gateway (reverse proxy) config
+├── docs/           # Documentation system (§8)
+├── docker-compose.yml
 ├── PRODUCTION_RULES.md
 └── TASKS.md
 ```
 
 ### 4.2 Frontend
 
-| Concern                      | Technology                                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Runtime / build              | **Vite 6**, **React 19**, **TypeScript 5.8+** (strict)                                                  |
-| Routing                      | **react-router-dom 6** (existing)                                                                       |
-| Server state / data fetching | **TanStack Query v5**                                                                                   |
-| Forms & validation           | Controlled components + **Zod** schemas from `shared/`                                                  |
-| Charts                       | **Recharts** (existing)                                                                                 |
-| Styling                      | Existing plain CSS in `src/index.css` with CSS custom properties (design tokens). No new CSS framework. |
-| Unit / component tests       | **Vitest** + **@testing-library/react** + **@testing-library/user-event** + **jsdom**                   |
-| API mocking in tests         | **MSW (Mock Service Worker) v2**                                                                        |
-| End-to-end tests             | **Playwright** (Chromium + mobile viewport)                                                             |
-| Accessibility tests          | **@axe-core/playwright** in e2e                                                                         |
-| Lint / format                | **ESLint 9** (existing flat config) + **Prettier**                                                      |
+Vite 6 · React 19 · TypeScript 5.8+ · react-router-dom 6 · TanStack Query v5 · Zod · Recharts ·
+plain CSS with custom properties (no CSS framework) · Vitest + Testing Library + MSW v2 ·
+Playwright + @axe-core/playwright · ESLint 9 + Prettier.
 
 ### 4.3 Backend
 
-| Concern            | Technology                                                                         |
-| ------------------ | ---------------------------------------------------------------------------------- |
-| Runtime            | **Node.js 26 LTS** (ESM)                                                           |
-| HTTP framework     | **Fastify 5**                                                                      |
-| Validation         | **Zod** via `fastify-type-provider-zod`                                            |
-| Database           | **PostgreSQL 16** (Docker in dev/test)                                             |
-| ORM / migrations   | **Prisma** (`prisma migrate`)                                                      |
-| Auth               | `@fastify/jwt` + `@fastify/cookie`, **argon2** (argon2id) password hashing         |
-| Security           | `@fastify/helmet`, `@fastify/cors`, `@fastify/rate-limit`                          |
-| Logging            | **pino** (Fastify built-in), JSON in production, redaction of auth headers/cookies |
-| API docs           | `@fastify/swagger` + `@fastify/swagger-ui` at `/docs` (dev only)                   |
-| Dev runner / build | **tsx** (dev watch), **tsup** (production bundle)                                  |
-| Tests              | **Vitest** + Fastify `app.inject()` against a real Postgres test database          |
-| Lint / format      | ESLint 9 + typescript-eslint + Prettier                                            |
+Node.js 26 LTS (ESM) · Fastify 5 · `fastify-type-provider-zod` · `@fastify/sensible` ·
+PostgreSQL 16 · Prisma · `@fastify/jwt` + `@fastify/cookie` · argon2 · `@fastify/helmet` ·
+`@fastify/rate-limit` · pino · `@fastify/swagger` (dev only) · tsx (dev) · tsup (build) ·
+Vitest with `app.inject()` against a real Postgres test database.
 
-### 4.4 Tooling / CI
+### 4.4 Gateway and CI
 
-- **GitHub Actions** (`.github/workflows/ci.yml`) runs on every push and PR: install → lint →
-  typecheck → unit/integration tests with coverage → build → e2e → audit. Postgres runs as a
-  service container.
-- **Docker Compose** provides `postgres` for local dev (`ironlog_dev`) and tests (`ironlog_test`).
-- `gh` CLI is used by the Release Agent to open and merge PRs.
+- **Caddy 2** reverse proxy: serves `dist/`, proxies `/api/v1/*` to the API, adds TLS in production.
+  In development, the Vite dev server proxies `/api` the same way.
+- Docker Compose for Postgres (dev/test) and the production stack (gateway + API + DB on a private network).
+- GitHub Actions: install → lint → format → typecheck → tests + coverage → build → e2e → audit.
 
 ---
 
 ## 5. Testing Standards
 
-### 5.1 Test types (all required where applicable)
+| Type            | Scope                                            | Tool                              |
+| --------------- | ------------------------------------------------ | --------------------------------- |
+| Unit            | Pure functions, schemas, conversions             | Vitest                            |
+| Component       | Pages/components with the API mocked             | Vitest + Testing Library + MSW    |
+| API integration | Each endpoint: success, 400, 401, cross-user 404 | Vitest + `app.inject()` + test DB |
+| End-to-end      | Critical journeys through gateway → API → DB     | Playwright                        |
+| Accessibility   | No serious/critical violations                   | axe-core                          |
 
-| Type            | Scope                                                                                    | Where                            | Tool                              |
-| --------------- | ---------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
-| Unit            | Pure functions (utils, calculations, unit conversion, schema parsing)                    | next to the code: `*.test.ts`    | Vitest                            |
-| Component       | A page/component renders and reacts to user input, with API mocked                       | `src/**/*.test.tsx`              | Vitest + RTL + MSW                |
-| API integration | Each endpoint: success, validation failure, unauthenticated, other user's data (403/404) | `server/src/routes/**/*.test.ts` | Vitest + `app.inject()` + test DB |
-| End-to-end      | Critical user journeys through real frontend + real backend                              | `e2e/*.spec.ts`                  | Playwright                        |
-| Accessibility   | No serious/critical axe violations on every page                                         | `e2e/a11y.spec.ts`               | axe-core                          |
+- Every acceptance criterion maps to a named test.
+- Every bug fix ships with a regression test.
+- Deterministic tests: fixed clock where dates matter, no real network, DB reset per test file.
+- Never skip, `.only`, or weaken a test to make it pass.
+- Coverage: `shared/`, utilities and backend services ≥ 90 % lines / 85 % branches; overall ≥ 80 % / 75 %.
 
-### 5.2 Rules
-
-- Every acceptance criterion in a task maps to at least one test. Name tests after the behaviour:
-  `it('rejects a set with negative reps')`.
-- Every bug fix includes a regression test that fails before the fix.
-- Tests are deterministic: no real network, fixed clock (`vi.useFakeTimers` / `vi.setSystemTime`)
-  where dates matter, DB reset between test files. No `sleep`-based waits — use proper awaits.
-- Never skip, `.only`, or weaken a test to make the suite pass. A `.skip` requires a linked
-  follow-up task and Release Agent approval.
-- **Coverage thresholds** (enforced in Vitest config, CI fails below them):
-  - `shared/`, `src/utils.ts`, backend services: **≥ 90 % lines, ≥ 85 % branches**
-  - Overall frontend and backend: **≥ 80 % lines, ≥ 75 % branches**
-
-### 5.3 Critical e2e journeys (must always pass before production)
-
-1. Register → log in → land on Dashboard.
-2. Log a workout with 2 exercises and 3 sets each → it appears in history → PR is shown.
-3. Add foods to two meals → Dashboard macros update.
-4. Add a weigh-in → Progress chart shows it.
-5. Add a health entry → appears in Health log.
-6. Change unit kg ↔ lb in Settings → weights display converted everywhere.
-7. Export backup → import it into a fresh account → data matches.
-8. Log out → protected pages redirect to login.
+**Critical e2e journeys:** register → login → dashboard · log a workout and see the PR · add foods and
+see macros update · add a weigh-in and see the chart · add a health entry · switch kg ↔ lb and see
+converted values · export then import a backup · logout redirects protected pages to login.
 
 ---
 
-## 6. Production Gate (Release Agent runs all, in order)
-
-Run from a **clean checkout** of the branch. Every command must exit 0.
+## 6. Production Gate (Agent 2, clean checkout, every command exits 0)
 
 ```bash
-docker compose up -d postgres            # test database
 npm ci && npm --prefix server ci
 npm run lint && npm --prefix server run lint
+npm run format:check
 npm run typecheck && npm --prefix server run typecheck
-npm --prefix server run db:migrate:test  # apply migrations to ironlog_test
-npm run test:coverage                    # frontend + shared, thresholds enforced
-npm --prefix server run test:coverage    # backend, thresholds enforced
+docker compose up -d postgres && npm --prefix server run db:migrate:test
+npm run test:coverage && npm --prefix server run test:coverage
 npm run build && npm --prefix server run build
-npm run test:e2e                         # boots API + web, runs Playwright incl. axe
+npm run test:e2e
 npm audit --omit=dev --audit-level=high && npm --prefix server audit --omit=dev --audit-level=high
-git status --porcelain                   # must be empty except intended changes (no stray files)
+git status --porcelain
 ```
 
-Then, after push: **GitHub Actions CI must be green** before merge (`gh pr checks --watch`).
-
-> Until a task introduces a script (e.g. `test:e2e` before FE-07), that gate is reported as
-> "N/A — introduced in <TASK-ID>", not as passed.
+A gate whose script does not exist yet is reported as `N/A (introduced in <ID>)`.
+After the push, GitHub Actions must be green before the PR is handed to the owner.
 
 ---
 
-## 7. Rules Compliance Checklist (Release Agent verifies before pushing)
+## 7. Compliance Checklist (Agent 2)
 
-- [ ] Work is on a correctly named feature branch, not `main`.
-- [ ] Diff only touches what the task requires (no unrelated changes, no scope creep).
-- [ ] Every acceptance criterion is met **and** covered by a named test.
-- [ ] All Production Gate commands (Section 6) pass.
-- [ ] Coverage thresholds met; no `.skip` / `.only` added.
-- [ ] No `any`, `@ts-ignore`, `console.log`, commented-out code, or TODOs without a task ID.
-- [ ] Inputs validated with Zod at every boundary; shared types come from `shared/`.
-- [ ] Auth-protected endpoints tested for unauthenticated + cross-user access.
-- [ ] No secrets, `.env`, `dist/`, coverage or test artifacts committed.
-- [ ] New dependencies are on the approved list or justified in the Handoff Report.
-- [ ] UI changes: loading/error/empty states, labels, keyboard access, 360 px layout checked.
-- [ ] Commits follow Conventional Commits and reference the task ID.
-- [ ] `README.md` updated if setup, scripts, env vars or features changed.
-- [ ] `TASKS.md` status updated to `[x]` for this task.
-
-Only when **every box is checked** does the Release Agent push and open the PR.
+- [ ] The task was started by the owner's `/code-task` command; no other task was touched.
+- [ ] Branch named `<type>/<id>-<slug>`, based on `main`.
+- [ ] The diff touches only files the task requires; nothing extra was added.
+- [ ] Every acceptance criterion is met and covered by a named test; full suite green (no regressions).
+- [ ] All §6 gates pass; coverage thresholds met; no `.skip` / `.only`.
+- [ ] No `any`, `@ts-ignore`, `console.log`, dead code or unnecessary comments.
+- [ ] Naming follows §3.2; errors follow §3.3 (HTTP status + Problem Details, no custom codes).
+- [ ] Security rules (§3.4) respected; auth endpoints tested for 401 and cross-user access.
+- [ ] No secrets or build/test artifacts committed; no unjustified dependencies.
+- [ ] No AI attribution in code, comments, commits, PR or docs.
+- [ ] Documentation updated per §8.
+- [ ] `TASKS.md` status set to `[x]`.
 
 ---
 
-## 8. Definition of Done
+## 8. Documentation System
 
-A task is done when: it is merged to `main` via PR, CI is green on `main` after merge, its
-acceptance criteria are verified, and `TASKS.md` shows it as `[x]`.
+Agent 2 updates documentation **after all tests pass**, in the same PR, as a `docs:` commit.
+Structure, templates and writing rules are defined in [`docs/README.md`](./docs/README.md).
+
+- Create a doc file only when the first task that needs it lands; never pre-write sections for
+  features that do not exist.
+- Update only the sections affected by the task; remove anything the task made stale.
+- Every task adds `docs/tasks/<ID>.md` and a `docs/CHANGELOG.md` entry.
+
+---
+
+## 9. Definition of Done
+
+All gates and checklist items pass, docs are updated, the PR is open with CI green, and the
+owner has reviewed and merged it.
