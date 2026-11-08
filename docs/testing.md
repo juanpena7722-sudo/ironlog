@@ -16,7 +16,7 @@ npm run test:coverage  # run with coverage and thresholds
 
 ## Coverage
 
-Coverage uses the v8 provider and writes `text`, `html` and `lcov` reports to `coverage/`
+Coverage uses the v8 provider and writes `text` and `html` reports to `coverage/`
 (git-ignored).
 
 | Scope       | Lines | Branches |

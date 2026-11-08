@@ -11,24 +11,49 @@ A web app for bodybuilders to track workouts, diet, body progress and health.
 - **Health:** sleep, water, resting HR, steps, energy and notes
 - **Settings:** targets, kg/lb units, macro suggestions, JSON backup export/import, demo data
 
-All data is stored locally in the browser (localStorage).
+All data is currently stored locally in the browser (localStorage).
 
-## Development
+## Tech stack
+
+Vite, React 19, TypeScript, React Router, Recharts and Zod. Tooling: ESLint, Prettier, Vitest
+and GitHub Actions.
+
+## Getting started
+
+Requires Node.js 26.
 
 ```bash
-npm install
-npm run dev            # start dev server
-npm run build          # type-check and build to dist/
-npm run lint           # ESLint
-npm run format         # format all files with Prettier (format:check to verify only)
-npm run typecheck      # TypeScript project check, including shared/
-npm test               # Vitest unit tests
-npm run test:coverage  # tests with coverage thresholds enforced
+npm ci
+npm run dev
 ```
 
-Data shapes are defined once as Zod schemas in `shared/schemas.ts` (imported via the
-`@shared/*` alias); `src/types.ts` re-exports the inferred types. CI
-(`.github/workflows/ci.yml`) runs lint, format check, typecheck, coverage, build and
+## Scripts
+
+| Script                  | What it does                                |
+| ----------------------- | ------------------------------------------- |
+| `npm run dev`           | Start the dev server                        |
+| `npm run build`         | Type-check and build to `dist/`             |
+| `npm run preview`       | Serve the built app                         |
+| `npm run lint`          | ESLint                                      |
+| `npm run format`        | Format all files with Prettier              |
+| `npm run format:check`  | Verify formatting                           |
+| `npm run typecheck`     | TypeScript check, including `shared/`       |
+| `npm test`              | Run unit tests                              |
+| `npm run test:coverage` | Run tests with coverage thresholds enforced |
+
+CI (`.github/workflows/ci.yml`) runs lint, format check, typecheck, coverage, build and
 `npm audit` on every push and pull request.
 
-Built with Vite, React, TypeScript and Recharts.
+## Project structure
+
+```
+src/        React app (pages, components, store, utils)
+shared/     Zod schemas and the data types inferred from them (@shared/* alias)
+docs/       Project documentation
+```
+
+## Documentation
+
+- [`docs/`](./docs/README.md): setup, testing, changelog and task records
+- [`PRODUCTION_RULES.md`](./PRODUCTION_RULES.md): development, testing, security and release rules
+- [`TASKS.md`](./TASKS.md): frontend (`TF`) and backend (`TB`) task backlog

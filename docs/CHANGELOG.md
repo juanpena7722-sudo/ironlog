@@ -12,4 +12,5 @@
   `test-results`.
 - Changed: `src/types.ts` re-exports the types inferred from `shared/schemas.ts`.
 - Changed: all existing files reformatted with Prettier (no behaviour change).
+- Removed: comments that restated the code, scaffold comments, unused exports.
 - Security: `react-router-dom` bumped to `^6.30.6` to clear a high-severity advisory.
