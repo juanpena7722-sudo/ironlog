@@ -83,6 +83,16 @@ describe('PUT /health-entries/:date', () => {
     expect(paths).toEqual(expect.arrayContaining(['sleepHours', 'steps', 'energy']))
   })
 
+  it('returns 400 when steps exceed the cap', async () => {
+    const response = await send({
+      method: 'PUT',
+      url: `${HEALTH_URL}/${DATE}`,
+      payload: { steps: 200001 },
+    })
+    expectProblem(response, 400)
+    expect(response.json().errors.map((error: { path: string }) => error.path)).toEqual(['steps'])
+  })
+
   it('returns 400 for an invalid date', async () => {
     for (const date of ['2026-02-30', 'not-a-date']) {
       expectProblem(
