@@ -3,7 +3,7 @@ import { GoalsSchema, type Goals } from '../../shared/schemas.js'
 import type { Goals as GoalsRow } from './generated/prisma/client.js'
 import { DEFAULT_GOALS } from './auth.js'
 
-function toGoals(row: GoalsRow): Goals {
+export function toGoals(row: GoalsRow): Goals {
   return {
     unit: row.unit,
     calories: row.calories,

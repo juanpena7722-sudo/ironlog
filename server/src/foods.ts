@@ -14,7 +14,7 @@ const RECENT_QUERY_SCHEMA = z.object({
 
 type FoodInput = z.infer<typeof FOOD_INPUT_SCHEMA>
 
-function toFoodEntry(row: FoodEntryRow): FoodEntry {
+export function toFoodEntry(row: FoodEntryRow): FoodEntry {
   return {
     id: row.id,
     date: toISODate(row.date),
@@ -27,7 +27,7 @@ function toFoodEntry(row: FoodEntryRow): FoodEntry {
   }
 }
 
-function toFoodData(input: FoodInput) {
+export function toFoodData(input: FoodInput) {
   return { ...input, date: new Date(input.date) }
 }
 

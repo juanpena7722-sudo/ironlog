@@ -10,7 +10,7 @@ const WORKOUT_INPUT_SCHEMA = WorkoutSchema.omit({ id: true }).extend({
   exercises: z.array(ExerciseEntrySchema.omit({ id: true })),
 })
 
-const WORKOUT_INCLUDE = {
+export const WORKOUT_INCLUDE = {
   exercises: {
     orderBy: { position: 'asc' },
     include: { sets: { orderBy: { position: 'asc' } } },
@@ -20,7 +20,7 @@ const WORKOUT_INCLUDE = {
 type WorkoutRow = Prisma.WorkoutGetPayload<{ include: typeof WORKOUT_INCLUDE }>
 type WorkoutInput = z.infer<typeof WORKOUT_INPUT_SCHEMA>
 
-function toWorkout(row: WorkoutRow): Workout {
+export function toWorkout(row: WorkoutRow): Workout {
   return {
     id: row.id,
     date: toISODate(row.date),

@@ -3,6 +3,7 @@ import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply } f
 import sensible from '@fastify/sensible'
 import { ZodError } from 'zod'
 import { registerAuth } from './auth.js'
+import { backupRoutes } from './backup.js'
 import { bodyRoutes } from './body.js'
 import { createDb } from './db.js'
 import { foodRoutes } from './foods.js'
@@ -67,6 +68,7 @@ export function buildApp(env: Env, logStream?: { write(message: string): void })
   app.register(bodyRoutes, { prefix: '/api/v1/body' })
   app.register(healthRoutes, { prefix: '/api/v1/health-entries' })
   app.register(goalsRoutes, { prefix: '/api/v1/goals' })
+  app.register(backupRoutes, { prefix: '/api/v1/backup' })
 
   return app
 }
