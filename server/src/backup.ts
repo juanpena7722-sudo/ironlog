@@ -5,14 +5,14 @@ import { AppDataSchema, UnitSchema, type AppData } from '../../shared/schemas.js
 import { DEFAULT_GOALS } from './auth.js'
 import { toBodyData, toBodyEntry } from './body.js'
 import { toFoodData, toFoodEntry } from './foods.js'
-import type { Prisma } from './generated/prisma/client.js'
+import { Prisma } from './generated/prisma/client.js'
 import { toGoals } from './goals.js'
 import { toHealthData, toHealthEntry } from './health.js'
 import { toISODate } from './routes.js'
 import { WORKOUT_INCLUDE, toWorkout } from './workouts.js'
 
 const IMPORT_BODY_LIMIT = 5 * 1024 * 1024
-const IMPORT_TIMEOUT_MS = 60_000
+const IMPORT_TIMEOUT_MS = 120_000
 const LB_PER_KG = 2.20462
 const CM_PER_INCH = 2.54
 const MEASUREMENT_FIELDS = ['chest', 'waist', 'arms', 'thighs']
@@ -31,34 +31,39 @@ function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function objectsIn(value: unknown): JsonObject[] {
-  return Array.isArray(value) ? value.filter(isObject) : []
+function mapObjects(value: unknown, map: (record: JsonObject) => JsonObject): unknown {
+  return Array.isArray(value) ? value.map((item) => (isObject(item) ? map(item) : item)) : value
 }
 
-function convertFields(record: unknown, fields: string[], convert: (value: number) => number) {
-  if (!isObject(record)) return
+function convertFields(record: JsonObject, fields: string[], convert: (value: number) => number) {
+  const copy = { ...record }
   for (const field of fields) {
-    const value = record[field]
-    if (typeof value === 'number') record[field] = Math.round(convert(value) * 100) / 100
+    const value = copy[field]
+    if (typeof value === 'number') copy[field] = Math.round(convert(value) * 100) / 100
   }
+  return copy
 }
 
 // Converts before validation so the shared kg/cm limits apply to the converted values.
+// Copies only the known weight paths so unknown, possibly deeply nested fields are never walked.
 function convertFromLb(body: unknown): unknown {
   if (!isObject(body)) return body
-  const data = structuredClone(body)
   const toKg = (value: number) => value / LB_PER_KG
-  for (const workout of objectsIn(data.workouts)) {
-    for (const exercise of objectsIn(workout.exercises)) {
-      for (const set of objectsIn(exercise.sets)) convertFields(set, ['weight'], toKg)
-    }
+  const toCm = (value: number) => value * CM_PER_INCH
+  return {
+    ...body,
+    workouts: mapObjects(body.workouts, (workout) => ({
+      ...workout,
+      exercises: mapObjects(workout.exercises, (exercise) => ({
+        ...exercise,
+        sets: mapObjects(exercise.sets, (set) => convertFields(set, ['weight'], toKg)),
+      })),
+    })),
+    body: mapObjects(body.body, (entry) =>
+      convertFields(convertFields(entry, ['weight'], toKg), MEASUREMENT_FIELDS, toCm),
+    ),
+    goals: isObject(body.goals) ? convertFields(body.goals, ['targetWeight'], toKg) : body.goals,
   }
-  for (const entry of objectsIn(data.body)) {
-    convertFields(entry, ['weight'], toKg)
-    convertFields(entry, MEASUREMENT_FIELDS, (value) => value * CM_PER_INCH)
-  }
-  convertFields(data.goals, ['targetWeight'], toKg)
-  return data
 }
 
 function isUuid(id: string) {
@@ -264,8 +269,15 @@ export async function backupRoutes(app: FastifyInstance) {
   app.post('/import', { bodyLimit: IMPORT_BODY_LIMIT }, async (request) => {
     const { mode, unitHint } = IMPORT_QUERY_SCHEMA.parse(request.query)
     const data = AppDataSchema.parse(unitHint === 'lb' ? convertFromLb(request.body) : request.body)
-    return app.db.$transaction((tx) => importData(tx, request.userId, data, mode), {
-      timeout: IMPORT_TIMEOUT_MS,
-    })
+    try {
+      return await app.db.$transaction((tx) => importData(tx, request.userId, data, mode), {
+        timeout: IMPORT_TIMEOUT_MS,
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw app.httpErrors.conflict('Import conflicted with concurrent changes; retry')
+      }
+      throw error
+    }
   })
 }

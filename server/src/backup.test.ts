@@ -318,9 +318,58 @@ describe('POST /backup/import', () => {
     expect(response.json().errors).toEqual([expect.objectContaining({ path: 'body.0.chest' })])
   })
 
+  it('ignores deeply nested unknown fields with unitHint=lb', async () => {
+    const pad = '['.repeat(10_000) + ']'.repeat(10_000)
+    const payload = `${JSON.stringify(BACKUP).slice(0, -1)},"pad":${pad}}`
+    const response = await send({
+      method: 'POST',
+      url: `${IMPORT_URL}?mode=merge&unitHint=lb`,
+      payload,
+      headers: { 'content-type': 'application/json' },
+    })
+    expect(response.statusCode).toBe(200)
+    expect((await exportBackup()).body[0].weight).toBe(37.42)
+  })
+
   it('does not convert with unitHint=kg', async () => {
     await importBackup(BACKUP, 'mode=replace&unitHint=kg')
     expect((await exportBackup()).body[0].weight).toBe(82.5)
+  })
+
+  it('returns 409 when an unused id is taken by another user during the import', async () => {
+    const id = '22222222-2222-4222-8222-222222222222'
+    const other = await app.db.user.create({
+      data: { email: 'other@example.com', passwordHash: '' },
+    })
+    const transaction = app.db.$transaction.bind(app.db)
+    vi.spyOn(app.db, '$transaction').mockImplementation(((
+      run: (tx: Prisma.TransactionClient) => Promise<unknown>,
+      options?: { timeout?: number },
+    ) =>
+      transaction(async (tx) => {
+        const findMany = tx.foodEntry.findMany.bind(tx.foodEntry)
+        vi.spyOn(tx.foodEntry, 'findMany').mockImplementation((async (
+          args: Prisma.FoodEntryFindManyArgs,
+        ) => {
+          const owners = await findMany(args)
+          await app.db.foodEntry.create({
+            data: {
+              ...BACKUP.foods[0],
+              id,
+              userId: other.id,
+              date: new Date(BACKUP.foods[0].date),
+            },
+          })
+          return owners
+        }) as unknown as typeof tx.foodEntry.findMany)
+        return run(tx)
+      }, options)) as unknown as typeof app.db.$transaction)
+    const backup = { ...BACKUP, foods: [{ ...BACKUP.foods[0], id }] }
+    const response = await importBackup(backup, 'mode=merge')
+    expectProblem(response, 409)
+    expect(response.json().detail).toBe('Import conflicted with concurrent changes; retry')
+    vi.restoreAllMocks()
+    expect(await exportBackup()).toMatchObject({ workouts: [], foods: [] })
   })
 
   it('returns 400 for an invalid file', async () => {
