@@ -577,4 +577,57 @@ Auth: required
 | 403    | Problem Details (foreign `Origin`)                  |
 | 404    | Problem Details, `detail`: `Health entry not found` |
 
-_Last updated by TB06._
+### Goals
+
+Both `/api/v1/goals` routes require a session and only see the current user's goals. A user has
+one set of goals.
+
+**`Goals` (request and response body)**
+
+Matches `GoalsSchema` in `shared/schemas.ts`. Every field is required. Unknown fields are
+ignored.
+
+| Field          | Type   | Rules                                                       |
+| -------------- | ------ | ----------------------------------------------------------- |
+| `unit`         | string | `kg` or `lb`: the display unit only                         |
+| `calories`     | number | 0–20000                                                     |
+| `protein`      | number | Grams, 0–2000                                               |
+| `carbs`        | number | Grams, 0–2000                                               |
+| `fat`          | number | Grams, 0–2000                                               |
+| `targetWeight` | number | Always kg, whatever `unit` is. 0–2000, stored to 2 decimals |
+| `waterL`       | number | Litres, 0–20                                                |
+| `sleepHours`   | number | Hours, 0–24                                                 |
+
+### GET /api/v1/goals
+
+Auth: required
+
+Returns the user's goals. If the user has no stored goals, it returns the default goals (the
+same values as [register](#post-apiv1authregister)) and does not store them.
+
+**Responses**
+
+| Status | Body                                           |
+| ------ | ---------------------------------------------- |
+| 200    | `Goals`                                        |
+| 401    | Problem Details, `detail`: `Not authenticated` |
+
+### PUT /api/v1/goals
+
+Auth: required
+
+Replaces the user's goals, or creates them if none are stored (upsert). It always returns 200.
+The body must be a full `Goals` object; a partial body returns 400.
+
+**Request:** `Goals`
+
+**Responses**
+
+| Status | Body                                           |
+| ------ | ---------------------------------------------- |
+| 200    | `Goals`                                        |
+| 400    | Problem Details with `errors`                  |
+| 401    | Problem Details, `detail`: `Not authenticated` |
+| 403    | Problem Details (foreign `Origin`)             |
+
+_Last updated by TB07._

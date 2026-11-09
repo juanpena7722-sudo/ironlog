@@ -1,5 +1,13 @@
 # Changelog
 
+## TB07 — Goals API (2026-11-08)
+
+- Added: `GET /api/v1/goals` (the stored goals, or the defaults when none are stored) and
+  `PUT /api/v1/goals` (full `Goals` body validated with `GoalsSchema`, upsert, always 200) in
+  `server/src/goals.ts`.
+- Changed: `DEFAULT_GOALS` is exported from `server/src/auth.ts` and reused by the goals routes.
+- Security: both routes require a session and are scoped by `userId`.
+
 ## TB06 — Body and health API (2026-11-08)
 
 - Added: `GET /api/v1/body` (`from` / `to` filter, default last 90 days, newest first),
