@@ -9,7 +9,9 @@ const DEFAULT_RANGE_DAYS = 30
 const HEALTH_INPUT_SCHEMA = HealthEntrySchema.omit({ id: true, date: true })
 const DATE_PARAMS_SCHEMA = z.object({ date: ISODateSchema })
 
-function toHealthEntry(row: HealthEntryRow): HealthEntry {
+type HealthInput = z.infer<typeof HEALTH_INPUT_SCHEMA>
+
+export function toHealthEntry(row: HealthEntryRow): HealthEntry {
   return {
     id: row.id,
     date: toISODate(row.date),
@@ -19,6 +21,17 @@ function toHealthEntry(row: HealthEntryRow): HealthEntry {
     steps: row.steps ?? undefined,
     energy: row.energy ?? undefined,
     notes: row.notes ?? undefined,
+  }
+}
+
+export function toHealthData(input: HealthInput) {
+  return {
+    sleepHours: input.sleepHours ?? null,
+    waterL: input.waterL ?? null,
+    restingHR: input.restingHR ?? null,
+    steps: input.steps ?? null,
+    energy: input.energy ?? null,
+    notes: input.notes ?? null,
   }
 }
 
@@ -36,15 +49,7 @@ export async function healthRoutes(app: FastifyInstance) {
 
   app.put('/:date', async (request) => {
     const date = new Date(DATE_PARAMS_SCHEMA.parse(request.params).date)
-    const input = HEALTH_INPUT_SCHEMA.parse(request.body)
-    const data = {
-      sleepHours: input.sleepHours ?? null,
-      waterL: input.waterL ?? null,
-      restingHR: input.restingHR ?? null,
-      steps: input.steps ?? null,
-      energy: input.energy ?? null,
-      notes: input.notes ?? null,
-    }
+    const data = toHealthData(HEALTH_INPUT_SCHEMA.parse(request.body))
     const row = await app.db.healthEntry.upsert({
       where: { userId_date: { userId: request.userId, date } },
       create: { userId: request.userId, date, ...data },

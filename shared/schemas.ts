@@ -46,9 +46,14 @@ export const ISODateSchema = z
   .string()
   .refine(isRealISODate, { message: 'Expected a real calendar date in yyyy-mm-dd format' })
 
-const idSchema = z.string().min(1).max(NAME_MAX)
-const nameSchema = z.string().trim().min(1).max(NAME_MAX)
-const notesSchema = z.string().trim().max(NOTES_MAX)
+// Postgres rejects NUL in text columns.
+export const textSchema = z
+  .string()
+  .refine((value) => !value.includes('\u0000'), { message: 'Must not contain NUL characters' })
+
+const idSchema = textSchema.min(1).max(NAME_MAX)
+const nameSchema = textSchema.trim().min(1).max(NAME_MAX)
+const notesSchema = textSchema.trim().max(NOTES_MAX)
 const nonNegative = z.number().nonnegative()
 const weightSchema = z.number().min(0).max(WEIGHT_MAX)
 const measurementSchema = z.number().min(0).max(MEASUREMENT_CM_MAX)

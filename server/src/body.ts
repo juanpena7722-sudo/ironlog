@@ -10,7 +10,7 @@ const BODY_INPUT_SCHEMA = BodyEntrySchema.omit({ id: true })
 
 type BodyInput = z.infer<typeof BODY_INPUT_SCHEMA>
 
-function toBodyEntry(row: BodyEntryRow): BodyEntry {
+export function toBodyEntry(row: BodyEntryRow): BodyEntry {
   return {
     id: row.id,
     date: toISODate(row.date),
@@ -23,7 +23,7 @@ function toBodyEntry(row: BodyEntryRow): BodyEntry {
   }
 }
 
-function toBodyData(input: BodyInput) {
+export function toBodyData(input: BodyInput) {
   return {
     date: new Date(input.date),
     weight: input.weight,

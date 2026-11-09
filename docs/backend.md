@@ -13,6 +13,10 @@ The server uses the Zod schemas in `shared/schemas.ts` (the same ones the fronte
 relative import, for example `import { WorkoutSchema } from '../../shared/schemas.js'`. There is
 no path alias in `server/`.
 
+Postgres rejects the NUL character in text columns, so `shared/schemas.ts` exports `textSchema`,
+a string that rejects NUL. Ids, names and notes in the shared schemas, and the email and
+password schemas in `server/src/auth.ts`, build on it, so NUL returns 400 instead of 500.
+
 `shared/` has no `node_modules` of its own, and CI's backend job installs only the server
 dependencies (`npm ci` in `server/`). So that `tsc` can resolve `zod` for `shared/schemas.ts` in
 that case, `server/tsconfig.json` maps it to the server's copy:
@@ -26,20 +30,21 @@ Vitest and tsup resolve `zod` at run and build time without extra configuration.
 
 ## Modules
 
-| File                     | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `server/src/env.ts`      | `parseEnv(source)` validates environment variables with Zod and returns a typed `Env`. It throws on invalid input.                                                                                                                                                                                                                                                                                                             |
-| `server/src/app.ts`      | `buildApp(env, logStream?)` creates the Fastify instance: configures the logger, registers `@fastify/sensible`, decorates `app.db`, adds the 404 and global error handlers, calls `registerAuth()`, adds the health route and registers `workoutRoutes` under `/api/v1/workouts`, `foodRoutes` under `/api/v1/foods`, `bodyRoutes` under `/api/v1/body` and `healthRoutes` under `/api/v1/health-entries`. It does not listen. |
-| `server/src/auth.ts`     | `registerAuth(app, env)` registers cookies, JWT, the auth rate limit, `app.requireAuth`, the Origin check and the `/api/v1/auth` routes (see [Authentication](#authentication)).                                                                                                                                                                                                                                               |
-| `server/src/workouts.ts` | `workoutRoutes` plugin: the 5 `/api/v1/workouts` routes (see [Workouts](#workouts)).                                                                                                                                                                                                                                                                                                                                           |
-| `server/src/foods.ts`    | `foodRoutes` plugin: the 5 `/api/v1/foods` routes (see [Foods](#foods)).                                                                                                                                                                                                                                                                                                                                                       |
-| `server/src/body.ts`     | `bodyRoutes` plugin: the 4 `/api/v1/body` routes (see [Body](#body)).                                                                                                                                                                                                                                                                                                                                                          |
-| `server/src/health.ts`   | `healthRoutes` plugin: the 3 `/api/v1/health-entries` routes (see [Health entries](#health-entries)).                                                                                                                                                                                                                                                                                                                          |
-| `server/src/goals.ts`    | `goalsRoutes` plugin: the 2 `/api/v1/goals` routes (see [Goals](#goals)).                                                                                                                                                                                                                                                                                                                                                      |
-| `server/src/routes.ts`   | Helpers shared by the resource plugins: `ID_PARAMS_SCHEMA` (`:id` must be a UUID), `parseDateRange(query, defaultDays)` (validates `from` / `to` and returns the Prisma `date` filter) and `toISODate(date)` (`Date` to `yyyy-mm-dd`).                                                                                                                                                                                         |
-| `server/src/db.ts`       | `createDb(databaseUrl)` returns a `PrismaClient` that uses the `@prisma/adapter-pg` driver adapter. It also declares the `app.db` type on `FastifyInstance`.                                                                                                                                                                                                                                                                   |
-| `server/src/server.ts`   | Entry point. Parses `process.env`, builds the app and listens on `127.0.0.1:<PORT>`.                                                                                                                                                                                                                                                                                                                                           |
-| `server/src/test/db.ts`  | Test helpers: `TEST_ENV` (an `Env` pointing at `ironlog_test`) and `truncateTables(db)`.                                                                                                                                                                                                                                                                                                                                       |
+| File                     | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/src/env.ts`      | `parseEnv(source)` validates environment variables with Zod and returns a typed `Env`. It throws on invalid input.                                                                                                                                                                                                                                                                                                                                                                                         |
+| `server/src/app.ts`      | `buildApp(env, logStream?)` creates the Fastify instance: configures the logger, registers `@fastify/sensible`, decorates `app.db`, adds the 404 and global error handlers, calls `registerAuth()`, adds the health route and registers `workoutRoutes` under `/api/v1/workouts`, `foodRoutes` under `/api/v1/foods`, `bodyRoutes` under `/api/v1/body`, `healthRoutes` under `/api/v1/health-entries`, `goalsRoutes` under `/api/v1/goals` and `backupRoutes` under `/api/v1/backup`. It does not listen. |
+| `server/src/auth.ts`     | `registerAuth(app, env)` registers cookies, JWT, the auth rate limit, `app.requireAuth`, the Origin check and the `/api/v1/auth` routes (see [Authentication](#authentication)).                                                                                                                                                                                                                                                                                                                           |
+| `server/src/workouts.ts` | `workoutRoutes` plugin: the 5 `/api/v1/workouts` routes (see [Workouts](#workouts)).                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `server/src/foods.ts`    | `foodRoutes` plugin: the 5 `/api/v1/foods` routes (see [Foods](#foods)).                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `server/src/body.ts`     | `bodyRoutes` plugin: the 4 `/api/v1/body` routes (see [Body](#body)).                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `server/src/health.ts`   | `healthRoutes` plugin: the 3 `/api/v1/health-entries` routes (see [Health entries](#health-entries)).                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `server/src/goals.ts`    | `goalsRoutes` plugin: the 2 `/api/v1/goals` routes (see [Goals](#goals)).                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `server/src/backup.ts`   | `backupRoutes` plugin: `GET /api/v1/backup` and `POST /api/v1/backup/import` (see [Backup](#backup)).                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `server/src/routes.ts`   | Helpers shared by the resource plugins: `ID_PARAMS_SCHEMA` (`:id` must be a UUID), `parseDateRange(query, defaultDays)` (validates `from` / `to` and returns the Prisma `date` filter) and `toISODate(date)` (`Date` to `yyyy-mm-dd`).                                                                                                                                                                                                                                                                     |
+| `server/src/db.ts`       | `createDb(databaseUrl)` returns a `PrismaClient` that uses the `@prisma/adapter-pg` driver adapter. It also declares the `app.db` type on `FastifyInstance`.                                                                                                                                                                                                                                                                                                                                               |
+| `server/src/server.ts`   | Entry point. Parses `process.env`, builds the app and listens on `127.0.0.1:<PORT>`.                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `server/src/test/db.ts`  | Test helpers: `TEST_ENV` (an `Env` pointing at `ironlog_test`) and `truncateTables(db)`.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Tests call `buildApp()` and use `app.inject()`, so no port is opened.
 
@@ -79,7 +84,7 @@ it through the `postinstall` script (`prisma generate`). ESLint and coverage ski
 
 Table names match the model names. Every model has `userId`, `createdAt` (default `now()`) and
 `updatedAt` (set by Prisma on update). Primary keys are UUIDs generated by Prisma, except
-`Goals`, whose key is `userId`.
+`Goals`, whose key is `userId`. A backup import may keep a UUID from the file (see [Backup](#backup)).
 
 | Model         | Fields                                                                                                                           |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -314,6 +319,42 @@ the prefix `/api/v1/goals` (reference in [`api.md`](./api.md#goals)).
 - **Response mapping.** `toGoals()` turns a row into the shared `Goals` shape; `targetWeight`
   (`Decimal(6,2)`, kg) becomes a number with `.toNumber()`, so it is rounded to 2 decimals.
 
+## Backup
+
+`server/src/backup.ts` exports `backupRoutes`, a Fastify plugin that `buildApp()` registers with
+the prefix `/api/v1/backup` (reference in [`api.md`](./api.md#backup)).
+
+- **Auth and scoping.** The plugin adds `app.requireAuth` as a `preHandler` hook. Export reads
+  and import writes only rows with `request.userId`.
+- **Export.** Reads the user's workouts (with `WORKOUT_INCLUDE`), foods, body and health entries
+  and goals in parallel, ordered newest first like the list routes, and maps them with the
+  existing `toWorkout()`, `toFoodEntry()`, `toBodyEntry()`, `toHealthEntry()` and `toGoals()`.
+  A user without a goals row gets `DEFAULT_GOALS`. The filename uses `toISODate(new Date())`.
+- **Validation.** The query is parsed with `IMPORT_QUERY_SCHEMA` (`mode`, `unitHint` default
+  `kg`) and the body with `AppDataSchema` from `shared/`. The route sets
+  `bodyLimit: IMPORT_BODY_LIMIT` (5 MB); Fastify returns 413 above it.
+- **lb conversion.** With `unitHint=lb`, `convertFromLb()` runs before validation, so the shared
+  kg/cm limits apply to the converted values. It shallow-copies only the known paths (set
+  `weight`, body `weight` and `MEASUREMENT_FIELDS`, goals `targetWeight`) and divides by
+  `LB_PER_KG` (2.20462) or multiplies by `CM_PER_INCH` (2.54), rounding to 2 decimals. Unknown
+  fields are never walked, so deep nesting cannot overflow the stack.
+- **Transaction.** `importData()` runs in `app.db.$transaction` with `timeout: IMPORT_TIMEOUT_MS`
+  (120 s). `replace` first deletes the user's workouts (exercises and sets by cascade), foods,
+  body and health entries and upserts the goals. Rows are then written with one `createMany`
+  per table.
+- **Ids.** For each table, one query loads the owners of the file's UUID ids.
+  `createIdResolver()` returns `null` for an id the user already owns (a duplicate, skipped), a
+  new `randomUUID()` for a non-UUID id or one owned by another user, and the lowercased id
+  otherwise. A UUID repeated within the file (in any case) is skipped after its first use.
+  Exercise ids that resolve to `null` get a new UUID instead, so a new workout keeps all of its
+  exercises. Health entries are also skipped
+  when the user already has one on that date.
+- **Order.** Entries arrive newest first, so each gets `createdAt` of the import time minus its
+  index in milliseconds, which keeps the order of entries on the same date.
+- **Conflicts.** A `P2002` unique-key error (another request took an id after the owner check)
+  rolls back the transaction and returns 409 `Import conflicted with concurrent changes; retry`.
+  Any other error rolls back and returns 500.
+
 ## Numeric limits
 
 Numbers in `shared/schemas.ts` have upper limits, so a value that passes validation fits its
@@ -355,4 +396,4 @@ response outside `development`.
 Route handlers throw `app.httpErrors.<name>(detail)` for expected failures (for example
 `app.httpErrors.conflict('Email already registered')`) and let the global handler format them.
 
-_Last updated by TB07._
+_Last updated by TB08._

@@ -1,5 +1,21 @@
 # Changelog
 
+## TB08 — Backup export/import API (2026-11-08)
+
+- Added: `GET /api/v1/backup` (all of the user's data as an `AppData` v1 attachment
+  `ironlog-backup-YYYY-MM-DD.json`) and `POST /api/v1/backup/import?mode=merge|replace&unitHint=kg|lb`
+  (5 MB limit, one transaction, returns `{ imported, skipped }` counts) in `server/src/backup.ts`.
+- Added: `unitHint=lb` converts weights to kg and inches to cm, rounded to 2 decimals, before
+  validation.
+- Added: 409 `Import conflicted with concurrent changes; retry` when another request takes an
+  imported id during the import.
+- Changed: the row mappers in `workouts.ts`, `foods.ts`, `body.ts`, `health.ts` and `goals.ts`
+  are exported for reuse; the health PUT field mapping moved into `toHealthData()`.
+- Fixed: a NUL character in an id, name, note, email or password returns 400 instead of 500
+  (`textSchema` in `shared/schemas.ts`).
+- Security: both routes require a session and are scoped by `userId`; imported ids owned by
+  another user are replaced, never reused.
+
 ## TB07 — Goals API (2026-11-08)
 
 - Added: `GET /api/v1/goals` (the stored goals, or the defaults when none are stored) and

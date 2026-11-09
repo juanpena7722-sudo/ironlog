@@ -89,6 +89,11 @@ describe('POST /foods', () => {
     expect(paths).toEqual(expect.arrayContaining(['date', 'meal', 'name', 'calories']))
   })
 
+  it('returns 400 for a name containing a NUL character', async () => {
+    const payload = { ...FOOD, name: 'Chicken\u0000Rice' }
+    expectProblem(await send({ method: 'POST', url: FOODS_URL, payload }), 400)
+  })
+
   it('returns 401 without a session', async () => {
     expectProblem(await send({ method: 'POST', url: FOODS_URL, payload: FOOD }, null), 401)
   })

@@ -148,6 +148,8 @@ describe('ExerciseEntrySchema', () => {
     ['whitespace-only name', { ...exercise, name: '   ' }],
     ['name over 100 chars', { ...exercise, name: 'a'.repeat(NAME_MAX + 1) }],
     ['empty id', { ...exercise, id: '' }],
+    ['a NUL character in the name', { ...exercise, name: 'Bench\u0000Press' }],
+    ['a NUL character in the id', { ...exercise, id: 'e\u00001' }],
     ['empty muscle', { ...exercise, muscle: '' }],
     ['an invalid set', { ...exercise, sets: [{ reps: -1, weight: 0 }] }],
     ['sets not an array', { ...exercise, sets: set }],
@@ -170,6 +172,7 @@ describe('WorkoutSchema', () => {
 
   it.each([
     ['notes over 2000 chars', { ...workout, notes: 'n'.repeat(NOTES_MAX + 1) }],
+    ['a NUL character in the notes', { ...workout, notes: 'felt\u0000good' }],
     ['invalid date', { ...workout, date: '2026-02-30' }],
     ['negative duration', { ...workout, durationMin: -5 }],
     ['empty name', { ...workout, name: ' ' }],
