@@ -6,6 +6,7 @@ import { registerAuth } from './auth.js'
 import { bodyRoutes } from './body.js'
 import { createDb } from './db.js'
 import { foodRoutes } from './foods.js'
+import { goalsRoutes } from './goals.js'
 import type { Env } from './env.js'
 import { healthRoutes } from './health.js'
 import { workoutRoutes } from './workouts.js'
@@ -65,6 +66,7 @@ export function buildApp(env: Env, logStream?: { write(message: string): void })
   app.register(foodRoutes, { prefix: '/api/v1/foods' })
   app.register(bodyRoutes, { prefix: '/api/v1/body' })
   app.register(healthRoutes, { prefix: '/api/v1/health-entries' })
+  app.register(goalsRoutes, { prefix: '/api/v1/goals' })
 
   return app
 }

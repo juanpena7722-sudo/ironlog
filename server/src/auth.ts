@@ -33,7 +33,7 @@ const COOKIE_OPTIONS = {
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const RATE_LIMIT = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }
 const INVALID_CREDENTIALS = 'Invalid email or password'
-const DEFAULT_GOALS = {
+export const DEFAULT_GOALS = {
   unit: 'kg',
   calories: 2800,
   protein: 200,

@@ -279,7 +279,7 @@ and is scoped to the current user; another user's resource returns 404.
 
 1. Same test set as TB04 for both resources; an upsert on an existing date updates it.
 
-### [ ] TB07 — Goals API
+### [x] TB07 — Goals API
 
 **Branch:** `feat/tb07-goals-api`
 

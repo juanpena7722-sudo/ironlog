@@ -35,6 +35,7 @@ Vitest and tsup resolve `zod` at run and build time without extra configuration.
 | `server/src/foods.ts`    | `foodRoutes` plugin: the 5 `/api/v1/foods` routes (see [Foods](#foods)).                                                                                                                                                                                                                                                                                                                                                       |
 | `server/src/body.ts`     | `bodyRoutes` plugin: the 4 `/api/v1/body` routes (see [Body](#body)).                                                                                                                                                                                                                                                                                                                                                          |
 | `server/src/health.ts`   | `healthRoutes` plugin: the 3 `/api/v1/health-entries` routes (see [Health entries](#health-entries)).                                                                                                                                                                                                                                                                                                                          |
+| `server/src/goals.ts`    | `goalsRoutes` plugin: the 2 `/api/v1/goals` routes (see [Goals](#goals)).                                                                                                                                                                                                                                                                                                                                                      |
 | `server/src/routes.ts`   | Helpers shared by the resource plugins: `ID_PARAMS_SCHEMA` (`:id` must be a UUID), `parseDateRange(query, defaultDays)` (validates `from` / `to` and returns the Prisma `date` filter) and `toISODate(date)` (`Date` to `yyyy-mm-dd`).                                                                                                                                                                                         |
 | `server/src/db.ts`       | `createDb(databaseUrl)` returns a `PrismaClient` that uses the `@prisma/adapter-pg` driver adapter. It also declares the `app.db` type on `FastifyInstance`.                                                                                                                                                                                                                                                                   |
 | `server/src/server.ts`   | Entry point. Parses `process.env`, builds the app and listens on `127.0.0.1:<PORT>`.                                                                                                                                                                                                                                                                                                                                           |
@@ -298,6 +299,21 @@ the prefix `/api/v1/health-entries` (reference in [`api.md`](./api.md#health-ent
 - **Delete.** `deleteMany` with `userId` and `date`; a count of 0 returns 404
   `Health entry not found`.
 
+## Goals
+
+`server/src/goals.ts` exports `goalsRoutes`, a Fastify plugin that `buildApp()` registers with
+the prefix `/api/v1/goals` (reference in [`api.md`](./api.md#goals)).
+
+- **Auth and scoping.** The plugin adds `app.requireAuth` as a `preHandler` hook. Both queries
+  use `request.userId` as the key of the `Goals` row.
+- **Defaults.** `DEFAULT_GOALS` is exported from `server/src/auth.ts`. Register creates the
+  user's `Goals` row with it, and `GET` returns it when the user has no row, without creating one.
+- **Validation.** `PUT` parses the full body with `GoalsSchema` from `shared/`; a partial or
+  invalid body is a `ZodError` and returns 400.
+- **Upsert (PUT).** `upsert` on `userId` creates or replaces the row and always returns 200.
+- **Response mapping.** `toGoals()` turns a row into the shared `Goals` shape; `targetWeight`
+  (`Decimal(6,2)`, kg) becomes a number with `.toNumber()`, so it is rounded to 2 decimals.
+
 ## Numeric limits
 
 Numbers in `shared/schemas.ts` have upper limits, so a value that passes validation fits its
@@ -339,4 +355,4 @@ response outside `development`.
 Route handlers throw `app.httpErrors.<name>(detail)` for expected failures (for example
 `app.httpErrors.conflict('Email already registered')`) and let the global handler format them.
 
-_Last updated by TB06._
+_Last updated by TB07._
