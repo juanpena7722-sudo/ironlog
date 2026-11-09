@@ -26,17 +26,19 @@ Vitest and tsup resolve `zod` at run and build time without extra configuration.
 
 ## Modules
 
-| File                     | Purpose                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/src/env.ts`      | `parseEnv(source)` validates environment variables with Zod and returns a typed `Env`. It throws on invalid input.                                                                                                                                                                                                                           |
-| `server/src/app.ts`      | `buildApp(env, logStream?)` creates the Fastify instance: configures the logger, registers `@fastify/sensible`, decorates `app.db`, adds the 404 and global error handlers, calls `registerAuth()`, adds the health route and registers `workoutRoutes` under `/api/v1/workouts` and `foodRoutes` under `/api/v1/foods`. It does not listen. |
-| `server/src/auth.ts`     | `registerAuth(app, env)` registers cookies, JWT, the auth rate limit, `app.requireAuth`, the Origin check and the `/api/v1/auth` routes (see [Authentication](#authentication)).                                                                                                                                                             |
-| `server/src/workouts.ts` | `workoutRoutes` plugin: the 5 `/api/v1/workouts` routes (see [Workouts](#workouts)).                                                                                                                                                                                                                                                         |
-| `server/src/foods.ts`    | `foodRoutes` plugin: the 5 `/api/v1/foods` routes (see [Foods](#foods)).                                                                                                                                                                                                                                                                     |
-| `server/src/routes.ts`   | Helpers shared by the resource plugins: `ID_PARAMS_SCHEMA` (`:id` must be a UUID), `parseDateRange(query, defaultDays)` (validates `from` / `to` and returns the Prisma `date` filter) and `toISODate(date)` (`Date` to `yyyy-mm-dd`).                                                                                                       |
-| `server/src/db.ts`       | `createDb(databaseUrl)` returns a `PrismaClient` that uses the `@prisma/adapter-pg` driver adapter. It also declares the `app.db` type on `FastifyInstance`.                                                                                                                                                                                 |
-| `server/src/server.ts`   | Entry point. Parses `process.env`, builds the app and listens on `127.0.0.1:<PORT>`.                                                                                                                                                                                                                                                         |
-| `server/src/test/db.ts`  | Test helpers: `TEST_ENV` (an `Env` pointing at `ironlog_test`) and `truncateTables(db)`.                                                                                                                                                                                                                                                     |
+| File                     | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `server/src/env.ts`      | `parseEnv(source)` validates environment variables with Zod and returns a typed `Env`. It throws on invalid input.                                                                                                                                                                                                                                                                                                             |
+| `server/src/app.ts`      | `buildApp(env, logStream?)` creates the Fastify instance: configures the logger, registers `@fastify/sensible`, decorates `app.db`, adds the 404 and global error handlers, calls `registerAuth()`, adds the health route and registers `workoutRoutes` under `/api/v1/workouts`, `foodRoutes` under `/api/v1/foods`, `bodyRoutes` under `/api/v1/body` and `healthRoutes` under `/api/v1/health-entries`. It does not listen. |
+| `server/src/auth.ts`     | `registerAuth(app, env)` registers cookies, JWT, the auth rate limit, `app.requireAuth`, the Origin check and the `/api/v1/auth` routes (see [Authentication](#authentication)).                                                                                                                                                                                                                                               |
+| `server/src/workouts.ts` | `workoutRoutes` plugin: the 5 `/api/v1/workouts` routes (see [Workouts](#workouts)).                                                                                                                                                                                                                                                                                                                                           |
+| `server/src/foods.ts`    | `foodRoutes` plugin: the 5 `/api/v1/foods` routes (see [Foods](#foods)).                                                                                                                                                                                                                                                                                                                                                       |
+| `server/src/body.ts`     | `bodyRoutes` plugin: the 4 `/api/v1/body` routes (see [Body](#body)).                                                                                                                                                                                                                                                                                                                                                          |
+| `server/src/health.ts`   | `healthRoutes` plugin: the 3 `/api/v1/health-entries` routes (see [Health entries](#health-entries)).                                                                                                                                                                                                                                                                                                                          |
+| `server/src/routes.ts`   | Helpers shared by the resource plugins: `ID_PARAMS_SCHEMA` (`:id` must be a UUID), `parseDateRange(query, defaultDays)` (validates `from` / `to` and returns the Prisma `date` filter) and `toISODate(date)` (`Date` to `yyyy-mm-dd`).                                                                                                                                                                                         |
+| `server/src/db.ts`       | `createDb(databaseUrl)` returns a `PrismaClient` that uses the `@prisma/adapter-pg` driver adapter. It also declares the `app.db` type on `FastifyInstance`.                                                                                                                                                                                                                                                                   |
+| `server/src/server.ts`   | Entry point. Parses `process.env`, builds the app and listens on `127.0.0.1:<PORT>`.                                                                                                                                                                                                                                                                                                                                           |
+| `server/src/test/db.ts`  | Test helpers: `TEST_ENV` (an `Env` pointing at `ironlog_test`) and `truncateTables(db)`.                                                                                                                                                                                                                                                                                                                                       |
 
 Tests call `buildApp()` and use `app.inject()`, so no port is opened.
 
@@ -257,6 +259,65 @@ prefix `/api/v1/foods` (reference in [`api.md`](./api.md#foods)).
 - **Replace (PUT) and delete.** `updateMany` / `deleteMany` with `id` and `userId`; a count of 0
   returns 404. PUT returns the parsed body with the path `id`.
 
+## Body
+
+`server/src/body.ts` exports `bodyRoutes`, a Fastify plugin that `buildApp()` registers with the
+prefix `/api/v1/body` (reference in [`api.md`](./api.md#body)).
+
+- **Auth and scoping.** The plugin adds `app.requireAuth` as a `preHandler` hook. Every query
+  filters by `request.userId`; another user's entry returns 404 `Body entry not found`.
+- **Validation.** Bodies are parsed with `BodyEntrySchema` from `shared/` without `id`
+  (`BODY_INPUT_SCHEMA`). `:id` and `from` / `to` use the helpers in `server/src/routes.ts`.
+- **Response mapping.** `toBodyEntry()` turns a row into the shared `BodyEntry` shape: `date`
+  becomes `yyyy-mm-dd`, the `Decimal` columns become numbers with `.toNumber()`, and null optional
+  fields are left out.
+- **List.** Ordered by `date` desc, then `createdAt` desc. `from` defaults to 90 days before the
+  current UTC day (`DEFAULT_RANGE_DAYS`); `to` has no default.
+- **Replace (PUT).** `toBodyData()` sets every optional field the body leaves out to `null`, so
+  PUT replaces the full entry. `updateManyAndReturn` with `id` and `userId` returns the updated
+  row; no row returns 404.
+- **Delete.** `deleteMany` with `id` and `userId`; a count of 0 returns 404.
+
+## Health entries
+
+`server/src/health.ts` exports `healthRoutes`, a Fastify plugin that `buildApp()` registers with
+the prefix `/api/v1/health-entries` (reference in [`api.md`](./api.md#health-entries)).
+
+- **Auth and scoping.** The plugin adds `app.requireAuth` as a `preHandler` hook. Every query
+  filters by `request.userId`.
+- **Validation.** `:date` is checked with `ISODateSchema` (`DATE_PARAMS_SCHEMA`). Bodies are
+  parsed with `HealthEntrySchema` from `shared/` without `id` and `date`
+  (`HEALTH_INPUT_SCHEMA`), so the date always comes from the path.
+- **Response mapping.** `toHealthEntry()` turns a row into the shared `HealthEntry` shape, with
+  `date` as `yyyy-mm-dd` and null fields left out.
+- **List.** Ordered by `date` desc. `from` defaults to 30 days before the current UTC day
+  (`DEFAULT_RANGE_DAYS`); `to` has no default.
+- **Upsert (PUT).** `upsert` on the `userId_date` unique key (`HealthEntry_userId_date_key`)
+  creates or updates the user's entry for the day and always returns 200. Fields the body leaves
+  out are set to `null`, so PUT replaces the full entry. An update keeps the row's `id`.
+- **Delete.** `deleteMany` with `userId` and `date`; a count of 0 returns 404
+  `Health entry not found`.
+
+## Numeric limits
+
+Numbers in `shared/schemas.ts` have upper limits, so a value that passes validation fits its
+column and oversized input returns 400, not 500. The only number without an upper limit is
+workout `durationMin` (≥ 0), a `double precision` column that holds any finite number.
+
+| Fields                                            | Rule             | Constant             |
+| ------------------------------------------------- | ---------------- | -------------------- |
+| Set `weight`, body `weight`, goals `targetWeight` | 0–2000 kg        | `WEIGHT_MAX`         |
+| Set `reps`                                        | Integer 0–1000   | `REPS_MAX`           |
+| Body `chest`, `waist`, `arms`, `thighs`           | 0–1000 cm        | `MEASUREMENT_CM_MAX` |
+| Body `bodyFat`                                    | 0–100 %          |                      |
+| Health `steps`                                    | Integer 0–200000 | `STEPS_MAX`          |
+| Health `restingHR`                                | 0–300            | `RESTING_HR_MAX`     |
+| Health and goals `waterL`                         | 0–20 L           | `WATER_L_MAX`        |
+| Health and goals `sleepHours`                     | 0–24             |                      |
+| Health `energy`                                   | Integer 1–5      |                      |
+| Food and goals `calories`                         | 0–20000          | `CALORIES_MAX`       |
+| Food and goals `protein`, `carbs`, `fat`          | 0–2000 g         | `MACRO_G_MAX`        |
+
 ## Error handling
 
 Every error response is RFC 9457 Problem Details, sent with
@@ -278,4 +339,4 @@ response outside `development`.
 Route handlers throw `app.httpErrors.<name>(detail)` for expected failures (for example
 `app.httpErrors.conflict('Email already registered')`) and let the global handler format them.
 
-_Last updated by TB05._
+_Last updated by TB06._

@@ -1,5 +1,20 @@
 # Changelog
 
+## TB06 — Body and health API (2026-11-08)
+
+- Added: `GET /api/v1/body` (`from` / `to` filter, default last 90 days, newest first),
+  `POST /api/v1/body`, `PUT /api/v1/body/:id` and `DELETE /api/v1/body/:id` in
+  `server/src/body.ts`.
+- Added: `GET /api/v1/health-entries` (`from` / `to` filter, default last 30 days, newest first),
+  `PUT /api/v1/health-entries/:date` (upsert, always 200) and
+  `DELETE /api/v1/health-entries/:date` in `server/src/health.ts`.
+- Changed: `shared/schemas.ts` caps numbers that had no upper limit: body `chest`, `waist`,
+  `arms`, `thighs` ≤ 1000 cm; health `steps` ≤ 200000, `restingHR` ≤ 300, `waterL` ≤ 20; food
+  and goals `calories` ≤ 20000, `protein` / `carbs` / `fat` ≤ 2000; goals `waterL` ≤ 20.
+- Fixed: oversized numbers (for example `steps: 3000000000`) return 400 instead of 500.
+- Security: every route requires a session and is scoped by `userId`; another user's entry
+  returns 404.
+
 ## TB05 — Food log API (2026-11-08)
 
 - Added: `GET /api/v1/foods` (`from` / `to` filter, default last 30 days, newest first),

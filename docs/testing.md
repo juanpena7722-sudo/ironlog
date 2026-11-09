@@ -10,9 +10,9 @@ npm test               # run once
 npm run test:coverage  # run with coverage and thresholds
 ```
 
-| File                     | Covers                                                                                            |
-| ------------------------ | ------------------------------------------------------------------------------------------------- |
-| `shared/schemas.test.ts` | Valid and invalid cases for every Zod schema in `shared/schemas.ts`, plus the exported constants. |
+| File                     | Covers                                                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `shared/schemas.test.ts` | Valid and invalid cases for every Zod schema in `shared/schemas.ts`, including each numeric upper limit (valid at the limit, invalid just above), plus the exported constants. |
 
 ## Coverage
 
@@ -50,6 +50,8 @@ npm --prefix server run test:coverage  # run with coverage and thresholds
 | `server/src/auth.test.ts`     | Register, login, logout, me and account deletion: success paths and cookie flags; 400 invalid input; 401 wrong password, unknown email, non-argon2 hash and missing/expired/tampered/foreign-secret token; Bearer header ignored; 409 duplicate; 403 foreign or `null` Origin; 429 after 10 requests; account deletion removes only that user's rows; password and hash absent from responses and logs.                              |
 | `server/src/workouts.test.ts` | Create, list, get, replace and delete: nested exercises and sets in order, empty optional fields omitted; inclusive `from`/`to` filter newest first; default last 90 days (fixed clock); PUT with fewer exercises removes the dropped ones; delete removes exercises and sets; 400 invalid body, date filter and malformed id; 401 without a session; 404 unknown id; cross-user 404 that leaves the other user's workout unchanged. |
 | `server/src/foods.test.ts`    | Create, list, recent, replace and delete: inclusive `from`/`to` filter newest first; default last 30 days (fixed clock); `recent` de-duplicated case-insensitively, newest first, respects `limit` (default 20) and reads past a batch of 100 duplicates; 400 invalid body, date filter, `limit` and malformed id; 401 without a session; 404 unknown id; cross-user 404 that leaves the other user's entry unchanged.               |
+| `server/src/body.test.ts`     | Create, list, replace and delete: numeric kg and cm values, empty optional fields omitted; inclusive `from`/`to` filter newest first; default last 90 days (fixed clock); PUT clears dropped fields; 400 invalid body, measurements above 1000 cm, date filter and malformed id; 401 without a session; 404 unknown id; cross-user 404 that leaves the other user's entry unchanged.                                                 |
+| `server/src/health.test.ts`   | Upsert, list and delete: PUT creates an entry and updates the existing one on the same date (same `id`), empty optional fields omitted; inclusive `from`/`to` filter newest first; default last 30 days (fixed clock); 400 invalid body, `steps` above 200000, invalid date and date filter; 401 without a session; 404 no entry for the date; another user's entry on the same date stays separate and unchanged.                   |
 
 ### Test database
 
@@ -66,6 +68,7 @@ fakes only `Date` (`vi.useFakeTimers({ toFake: ['Date'] })`) to expire a token.
 `workouts.test.ts` truncates before each test, signs sessions with `app.jwt.sign()` and fakes
 only `Date` the same way to test the default 90-day range. `foods.test.ts` does the same for the
 default 30-day range, and seeds `FoodEntry` rows with fixed `createdAt` values for `recent`.
+`body.test.ts` and `health.test.ts` do the same for their default 90-day and 30-day ranges.
 
 A test file that uses the database calls `truncateTables(app.db)` before its tests and
 `app.close()` after them, which disconnects the client. `db.test.ts` also truncates before each
@@ -80,4 +83,4 @@ Coverage measures `server/src/**/*.ts` except test files, `src/server.ts` (the e
 the generated Prisma client (`src/generated/**`),
 with thresholds of 90 % lines and 85 % branches. Reports go to `server/coverage/` (git-ignored).
 
-_Last updated by TB05._
+_Last updated by TB06._
