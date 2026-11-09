@@ -83,6 +83,10 @@ describe('POST /api/v1/auth/register', () => {
     expectProblem(await register(EMAIL, 'x'.repeat(129)), 400)
   })
 
+  it('returns 400 for an email containing a NUL character', async () => {
+    expectProblem(await register('lifter\u0000@example.com'), 400)
+  })
+
   it('returns 409 for a duplicate email in any case', async () => {
     await register()
     const response = await register('LIFTER@example.com')

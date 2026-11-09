@@ -4,6 +4,7 @@ import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import argon2 from 'argon2'
 import { z } from 'zod'
+import { textSchema } from '../../shared/schemas.js'
 import { Prisma } from './generated/prisma/client.js'
 import type { Env } from './env.js'
 
@@ -45,9 +46,9 @@ export const DEFAULT_GOALS = {
 } as const
 const PUBLIC_USER = { id: true, email: true } as const
 
-const EMAIL_SCHEMA = z.string().trim().toLowerCase().pipe(z.email().max(254))
-const PASSWORD_SCHEMA = z.string().min(1).max(128)
-const REGISTER_SCHEMA = z.object({ email: EMAIL_SCHEMA, password: z.string().min(10).max(128) })
+const EMAIL_SCHEMA = textSchema.trim().toLowerCase().pipe(z.email().max(254))
+const PASSWORD_SCHEMA = textSchema.min(1).max(128)
+const REGISTER_SCHEMA = z.object({ email: EMAIL_SCHEMA, password: textSchema.min(10).max(128) })
 const LOGIN_SCHEMA = z.object({ email: EMAIL_SCHEMA, password: PASSWORD_SCHEMA })
 const DELETE_ACCOUNT_SCHEMA = z.object({ password: PASSWORD_SCHEMA })
 
