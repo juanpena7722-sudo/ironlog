@@ -3,9 +3,11 @@ import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply } f
 import sensible from '@fastify/sensible'
 import { ZodError } from 'zod'
 import { registerAuth } from './auth.js'
+import { bodyRoutes } from './body.js'
 import { createDb } from './db.js'
 import { foodRoutes } from './foods.js'
 import type { Env } from './env.js'
+import { healthRoutes } from './health.js'
 import { workoutRoutes } from './workouts.js'
 
 type FieldError = { path: string; message: string }
@@ -61,6 +63,8 @@ export function buildApp(env: Env, logStream?: { write(message: string): void })
   app.get('/api/v1/health', async () => ({ status: 'ok' }))
   app.register(workoutRoutes, { prefix: '/api/v1/workouts' })
   app.register(foodRoutes, { prefix: '/api/v1/foods' })
+  app.register(bodyRoutes, { prefix: '/api/v1/body' })
+  app.register(healthRoutes, { prefix: '/api/v1/health-entries' })
 
   return app
 }

@@ -21,6 +21,12 @@ export const NAME_MAX = 100
 export const NOTES_MAX = 2000
 const REPS_MAX = 1000
 const WEIGHT_MAX = 2000
+const MEASUREMENT_CM_MAX = 1000
+const STEPS_MAX = 200000
+const RESTING_HR_MAX = 300
+const WATER_L_MAX = 20
+const CALORIES_MAX = 20000
+const MACRO_G_MAX = 2000
 
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
@@ -45,6 +51,10 @@ const nameSchema = z.string().trim().min(1).max(NAME_MAX)
 const notesSchema = z.string().trim().max(NOTES_MAX)
 const nonNegative = z.number().nonnegative()
 const weightSchema = z.number().min(0).max(WEIGHT_MAX)
+const measurementSchema = z.number().min(0).max(MEASUREMENT_CM_MAX)
+const caloriesSchema = nonNegative.max(CALORIES_MAX)
+const macroSchema = nonNegative.max(MACRO_G_MAX)
+const waterSchema = nonNegative.max(WATER_L_MAX)
 
 export const SetEntrySchema = z.object({
   reps: z.number().int().min(0).max(REPS_MAX),
@@ -74,10 +84,10 @@ export const FoodEntrySchema = z.object({
   date: ISODateSchema,
   meal: MealSchema,
   name: nameSchema,
-  calories: nonNegative,
-  protein: nonNegative,
-  carbs: nonNegative,
-  fat: nonNegative,
+  calories: caloriesSchema,
+  protein: macroSchema,
+  carbs: macroSchema,
+  fat: macroSchema,
 })
 
 export const BodyEntrySchema = z.object({
@@ -85,19 +95,19 @@ export const BodyEntrySchema = z.object({
   date: ISODateSchema,
   weight: weightSchema,
   bodyFat: z.number().min(0).max(100).optional(),
-  chest: nonNegative.optional(),
-  waist: nonNegative.optional(),
-  arms: nonNegative.optional(),
-  thighs: nonNegative.optional(),
+  chest: measurementSchema.optional(),
+  waist: measurementSchema.optional(),
+  arms: measurementSchema.optional(),
+  thighs: measurementSchema.optional(),
 })
 
 export const HealthEntrySchema = z.object({
   id: idSchema,
   date: ISODateSchema,
   sleepHours: z.number().min(0).max(24).optional(),
-  waterL: nonNegative.optional(),
-  restingHR: nonNegative.optional(),
-  steps: z.number().int().nonnegative().optional(),
+  waterL: waterSchema.optional(),
+  restingHR: nonNegative.max(RESTING_HR_MAX).optional(),
+  steps: z.number().int().nonnegative().max(STEPS_MAX).optional(),
   energy: z.number().int().min(1).max(5).optional(),
   notes: notesSchema.optional(),
 })
@@ -106,12 +116,12 @@ export const UnitSchema = z.enum(['kg', 'lb'])
 
 export const GoalsSchema = z.object({
   unit: UnitSchema,
-  calories: nonNegative,
-  protein: nonNegative,
-  carbs: nonNegative,
-  fat: nonNegative,
+  calories: caloriesSchema,
+  protein: macroSchema,
+  carbs: macroSchema,
+  fat: macroSchema,
   targetWeight: weightSchema,
-  waterL: nonNegative,
+  waterL: waterSchema,
   sleepHours: z.number().min(0).max(24),
 })
 

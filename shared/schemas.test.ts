@@ -196,6 +196,8 @@ describe('FoodEntrySchema', () => {
     expect(FoodEntrySchema.parse(food)).toEqual(food)
     const zero = { ...food, calories: 0, protein: 0, carbs: 0, fat: 0 }
     expect(FoodEntrySchema.safeParse(zero).success).toBe(true)
+    const max = { ...food, calories: 20000, protein: 2000, carbs: 2000, fat: 2000 }
+    expect(FoodEntrySchema.safeParse(max).success).toBe(true)
   })
 
   it.each([
@@ -203,6 +205,10 @@ describe('FoodEntrySchema', () => {
     ['negative protein', { ...food, protein: -1 }],
     ['negative carbs', { ...food, carbs: -1 }],
     ['negative fat', { ...food, fat: -1 }],
+    ['calories above 20000', { ...food, calories: 20001 }],
+    ['protein above 2000', { ...food, protein: 2001 }],
+    ['carbs above 2000', { ...food, carbs: 2001 }],
+    ['fat above 2000', { ...food, fat: 2001 }],
     ['unknown meal', { ...food, meal: 'Brunch' }],
     ['empty name', { ...food, name: '' }],
     ['name over 100 chars', { ...food, name: 'x'.repeat(NAME_MAX + 1) }],
@@ -230,6 +236,10 @@ describe('BodyEntrySchema', () => {
     ['negative waist', { ...body, waist: -1 }],
     ['negative arms', { ...body, arms: -1 }],
     ['negative thighs', { ...body, thighs: -1 }],
+    ['chest above 1000', { ...body, chest: 1001 }],
+    ['waist above 1000', { ...body, waist: 1001 }],
+    ['arms above 1000', { ...body, arms: 1001 }],
+    ['thighs above 1000', { ...body, thighs: 1001 }],
     ['invalid date', { ...body, date: 'yesterday' }],
   ])('rejects a body entry with %s', (_label, value) => {
     expect(BodyEntrySchema.safeParse(value).success).toBe(false)
@@ -240,6 +250,11 @@ describe('HealthEntrySchema', () => {
   it('accepts a full health entry and one with only id and date', () => {
     expect(HealthEntrySchema.parse(health)).toEqual(health)
     expect(HealthEntrySchema.safeParse({ id: 'h-2', date: '2026-11-07' }).success).toBe(true)
+  })
+
+  it('accepts water, resting HR and steps at their max', () => {
+    const max = { ...health, waterL: 20, restingHR: 300, steps: 200000 }
+    expect(HealthEntrySchema.safeParse(max).success).toBe(true)
   })
 
   it.each([1, 5])('accepts energy %i', (energy) => {
@@ -256,6 +271,9 @@ describe('HealthEntrySchema', () => {
     ['negative resting HR', { ...health, restingHR: -1 }],
     ['fractional steps', { ...health, steps: 10.5 }],
     ['negative steps', { ...health, steps: -1 }],
+    ['water above 20 L', { ...health, waterL: 20.1 }],
+    ['resting HR above 300', { ...health, restingHR: 301 }],
+    ['steps above 200000', { ...health, steps: 200001 }],
     ['notes over 2000 chars', { ...health, notes: 'n'.repeat(NOTES_MAX + 1) }],
     ['invalid date', { ...health, date: '2026-04-31' }],
   ])('rejects a health entry with %s', (_label, value) => {
@@ -267,6 +285,11 @@ describe('GoalsSchema', () => {
   it('accepts valid goals in both units', () => {
     expect(GoalsSchema.parse(goals)).toEqual(goals)
     expect(GoalsSchema.safeParse({ ...goals, unit: 'lb' }).success).toBe(true)
+  })
+
+  it('accepts calories, macros and water at their max', () => {
+    const max = { ...goals, calories: 20000, protein: 2000, carbs: 2000, fat: 2000, waterL: 20 }
+    expect(GoalsSchema.safeParse(max).success).toBe(true)
   })
 
   it('UnitSchema only allows kg and lb', () => {
@@ -282,6 +305,11 @@ describe('GoalsSchema', () => {
     ['negative target weight', { ...goals, targetWeight: -1 }],
     ['target weight above 2000', { ...goals, targetWeight: 2001 }],
     ['negative water', { ...goals, waterL: -1 }],
+    ['calories above 20000', { ...goals, calories: 20001 }],
+    ['protein above 2000', { ...goals, protein: 2001 }],
+    ['carbs above 2000', { ...goals, carbs: 2001 }],
+    ['fat above 2000', { ...goals, fat: 2001 }],
+    ['water above 20 L', { ...goals, waterL: 20.1 }],
     ['sleep above 24 hours', { ...goals, sleepHours: 25 }],
     ['missing field', { ...goals, calories: undefined }],
   ])('rejects goals with %s', (_label, value) => {
