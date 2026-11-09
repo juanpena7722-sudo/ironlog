@@ -291,7 +291,7 @@ and is scoped to the current user; another user's resource returns 404.
 
 1. Tests: defaults for a new user, update persists, 400, 401.
 
-### [?] TB08 — Backup export/import API
+### [x] TB08 — Backup export/import API
 
 **Branch:** `feat/tb08-backup-api`
 
