@@ -630,4 +630,86 @@ The body must be a full `Goals` object; a partial body returns 400.
 | 401    | Problem Details, `detail`: `Not authenticated` |
 | 403    | Problem Details (foreign `Origin`)             |
 
-_Last updated by TB07._
+### Backup
+
+Both `/api/v1/backup` routes require a session and only read or change the current user's data.
+
+**`AppData` (export body and import body)**
+
+Matches `AppDataSchema` in `shared/schemas.ts`. Unknown fields are ignored. Weights are kg and
+measurements cm, unless the import says otherwise with `unitHint=lb`.
+
+| Field      | Type   | Rules                                     |
+| ---------- | ------ | ----------------------------------------- |
+| `version`  | number | Must be `1`                               |
+| `workouts` | array  | `Workout` objects, as in the workouts API |
+| `foods`    | array  | `FoodEntry` objects                       |
+| `body`     | array  | `BodyEntry` objects                       |
+| `health`   | array  | `HealthEntry` objects                     |
+| `goals`    | object | `Goals`                                   |
+
+Each entry has an `id` (1–100 characters). Collections are newest first.
+
+### GET /api/v1/backup
+
+Auth: required
+
+Returns all of the user's workouts, foods, body entries, health entries and goals (the default
+goals if none are stored). The response has
+`Content-Disposition: attachment; filename="ironlog-backup-YYYY-MM-DD.json"`, with the current
+UTC date.
+
+**Responses**
+
+| Status | Body                                           |
+| ------ | ---------------------------------------------- |
+| 200    | `AppData`                                      |
+| 401    | Problem Details, `detail`: `Not authenticated` |
+
+### POST /api/v1/backup/import
+
+Auth: required
+
+Imports an `AppData` file. The whole import runs in one transaction: if anything fails, no data
+changes.
+
+**Query**
+
+| Param      | Type   | Rules                                                                                                                                                                                                                  |
+| ---------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`     | string | Required. `merge` adds only new entries; `replace` deletes all of the user's data first                                                                                                                                |
+| `unitHint` | string | `kg` (default) or `lb`. With `lb`, set and body `weight` and goals `targetWeight` are converted from lb to kg, and body `chest`, `waist`, `arms`, `thighs` from inches to cm, rounded to 2 decimals, before validation |
+
+**Request:** `AppData`, at most 5 MB.
+
+| Rule   | Behaviour                                                                                                                                                                              |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ids    | An unused UUID is kept. A non-UUID id, or a UUID that belongs to another user, gets a new UUID. An id the user already has, or a UUID repeated in the file, is skipped as a duplicate. |
+| Health | One entry per day: an entry for a date the user already has is skipped.                                                                                                                |
+| Goals  | `replace` overwrites the goals; `merge` keeps the existing goals and counts the file's goals as skipped.                                                                               |
+| Limits | The shared limits apply after any lb conversion (for example 4000 lb is accepted as 1814.37 kg).                                                                                       |
+
+**Responses**
+
+| Status | Body                                                                                                  |
+| ------ | ----------------------------------------------------------------------------------------------------- |
+| 200    | `{ imported: Counts, skipped: Counts }`, where `Counts` is `{ workouts, foods, body, health, goals }` |
+| 400    | Problem Details with `errors` (invalid file, `mode` or `unitHint`), or invalid JSON                   |
+| 401    | Problem Details, `detail`: `Not authenticated`                                                        |
+| 403    | Problem Details (foreign `Origin`)                                                                    |
+| 409    | Problem Details, `detail`: `Import conflicted with concurrent changes; retry`                         |
+| 413    | Problem Details, `detail`: `Request body is too large` (body over 5 MB)                               |
+
+Example 200 body:
+
+```json
+{
+  "imported": { "workouts": 3, "foods": 2, "body": 2, "health": 2, "goals": 1 },
+  "skipped": { "workouts": 0, "foods": 0, "body": 0, "health": 0, "goals": 0 }
+}
+```
+
+An export larger than 5 MB cannot be imported. The import times out after 120 s and then
+returns 500 with no changes.
+
+_Last updated by TB08._
