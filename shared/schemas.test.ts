@@ -230,6 +230,10 @@ describe('BodyEntrySchema', () => {
     ['negative waist', { ...body, waist: -1 }],
     ['negative arms', { ...body, arms: -1 }],
     ['negative thighs', { ...body, thighs: -1 }],
+    ['chest above 1000', { ...body, chest: 1001 }],
+    ['waist above 1000', { ...body, waist: 1001 }],
+    ['arms above 1000', { ...body, arms: 1001 }],
+    ['thighs above 1000', { ...body, thighs: 1001 }],
     ['invalid date', { ...body, date: 'yesterday' }],
   ])('rejects a body entry with %s', (_label, value) => {
     expect(BodyEntrySchema.safeParse(value).success).toBe(false)

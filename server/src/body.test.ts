@@ -82,6 +82,17 @@ describe('POST /body', () => {
     expect(paths).toEqual(expect.arrayContaining(['date', 'weight', 'bodyFat', 'waist']))
   })
 
+  it('returns 400 for measurements above 1000 cm', async () => {
+    const response = await send({
+      method: 'POST',
+      url: BODY_URL,
+      payload: { ...ENTRY, chest: 1001, waist: 1001, arms: 1001, thighs: 1001 },
+    })
+    expectProblem(response, 400)
+    const paths = response.json().errors.map((error: { path: string }) => error.path)
+    expect(paths).toEqual(expect.arrayContaining(['chest', 'waist', 'arms', 'thighs']))
+  })
+
   it('returns 401 without a session', async () => {
     expectProblem(await send({ method: 'POST', url: BODY_URL, payload: ENTRY }, null), 401)
   })

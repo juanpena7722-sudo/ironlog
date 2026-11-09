@@ -21,6 +21,7 @@ export const NAME_MAX = 100
 export const NOTES_MAX = 2000
 const REPS_MAX = 1000
 const WEIGHT_MAX = 2000
+const MEASUREMENT_CM_MAX = 1000
 
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
@@ -45,6 +46,7 @@ const nameSchema = z.string().trim().min(1).max(NAME_MAX)
 const notesSchema = z.string().trim().max(NOTES_MAX)
 const nonNegative = z.number().nonnegative()
 const weightSchema = z.number().min(0).max(WEIGHT_MAX)
+const measurementSchema = z.number().min(0).max(MEASUREMENT_CM_MAX)
 
 export const SetEntrySchema = z.object({
   reps: z.number().int().min(0).max(REPS_MAX),
@@ -85,10 +87,10 @@ export const BodyEntrySchema = z.object({
   date: ISODateSchema,
   weight: weightSchema,
   bodyFat: z.number().min(0).max(100).optional(),
-  chest: nonNegative.optional(),
-  waist: nonNegative.optional(),
-  arms: nonNegative.optional(),
-  thighs: nonNegative.optional(),
+  chest: measurementSchema.optional(),
+  waist: measurementSchema.optional(),
+  arms: measurementSchema.optional(),
+  thighs: measurementSchema.optional(),
 })
 
 export const HealthEntrySchema = z.object({
