@@ -266,7 +266,7 @@ and is scoped to the current user; another user's resource returns 404.
 
 1. Same test set as TB04; `recent` is de-duplicated and respects `limit`.
 
-### [ ] TB06 — Body and health API
+### [?] TB06 — Body and health API
 
 **Branch:** `feat/tb06-body-health-api`
 
