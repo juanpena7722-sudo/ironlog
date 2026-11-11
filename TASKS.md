@@ -307,7 +307,7 @@ and is scoped to the current user; another user's resource returns 404.
 1. Round trip: export → import into a new user → export gives identical data (ignoring ids and timestamps).
 2. Tests: invalid file 400, atomic replace, merge skips duplicates, lb→kg to 2 decimals, > 5 MB 413.
 
-### [?] TB09 — Hardening, gateway and production stack
+### [x] TB09 — Hardening, gateway and production stack
 
 **Branch:** `feat/tb09-hardening-gateway`
 
