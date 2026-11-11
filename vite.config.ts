@@ -11,7 +11,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:3000',
+      // The string shorthand sets changeOrigin, so the API would see a Host that differs from Origin.
+      '/api': { target: 'http://localhost:3000' },
     },
   },
   test: {

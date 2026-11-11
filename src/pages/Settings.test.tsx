@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SESSION_KEY } from '../api/auth'
 import type { AppData, BodyEntry } from '../types'
@@ -157,6 +157,32 @@ describe('your data', () => {
     const body = imports[0].body as AppData
     expect(body.workouts.length).toBeGreaterThan(0)
     expect(body.body.length).toBeGreaterThan(0)
+  })
+
+  it.each([
+    [
+      'fails',
+      () => HttpResponse.json({ title: 'Internal Server Error', status: 500 }, { status: 500 }),
+      'error',
+    ],
+    ['is still loading', () => delay('infinite'), 'pending'],
+  ])('cannot clear all logs while GET /goals %s', async (_, resolver, status) => {
+    let calls = 0
+    server.use(
+      http.get('/api/v1/goals', resolver),
+      http.post('/api/v1/backup/import', () => {
+        calls += 1
+        return HttpResponse.json({ imported: {}, skipped: {} })
+      }),
+    )
+    const queryClient = renderWithProviders(<Settings />)
+    const clear = screen.getByRole('button', { name: 'Clear all logs' })
+    await waitFor(() => expect(queryClient.getQueryState(['goals'])?.status).toBe(status))
+
+    expect(clear).toHaveProperty('disabled', true)
+    await userEvent.setup().click(clear)
+    expect(screen.queryByRole('button', { name: 'Yes, continue' })).toBeNull()
+    expect(calls).toBe(0)
   })
 
   it('clears all logs but keeps the targets', async () => {

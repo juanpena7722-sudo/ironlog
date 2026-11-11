@@ -118,9 +118,10 @@ export default function Settings() {
   }
 
   const confirm = () => {
-    if (pending === 'reset') {
+    // Clearing keeps the saved goals, so it waits until they have loaded.
+    if (pending === 'reset' && saved) {
       replaceData.mutate(
-        { version: 1, workouts: [], foods: [], body: [], health: [], goals: current },
+        { version: 1, workouts: [], foods: [], body: [], health: [], goals: saved },
         { onSuccess: () => flash('All logs cleared.') },
       )
     } else if (pending === 'demo') {
@@ -249,7 +250,7 @@ export default function Settings() {
             <button className="ghost" onClick={() => setPending('demo')}>
               Load demo data
             </button>
-            <button className="ghost danger" onClick={() => setPending('reset')}>
+            <button className="ghost danger" disabled={!saved} onClick={() => setPending('reset')}>
               Clear all logs
             </button>
           </div>
@@ -262,7 +263,11 @@ export default function Settings() {
                 This can’t be undone.
               </p>
               <div className="actions">
-                <button className="danger-solid" onClick={confirm}>
+                <button
+                  className="danger-solid"
+                  disabled={pending === 'reset' && !saved}
+                  onClick={confirm}
+                >
                   Yes, continue
                 </button>
                 <button className="ghost" onClick={() => setPending(null)}>
