@@ -96,7 +96,7 @@ Releases (versioning, tags, deployment) are decided and triggered by the owner o
 
 1. Tests: success parse, Problem Details → `ApiError`, malformed response rejected, network failure surfaced.
 
-### [?] TF03 — Auth screens and protected routes
+### [x] TF03 — Auth screens and protected routes
 
 **Branch:** `feat/tf03-auth-ui`
 
