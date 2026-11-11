@@ -9,6 +9,11 @@ export default defineConfig({
       '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      '/api': 'http://localhost:3000',
+    },
+  },
   test: {
     include: ['shared/**/*.test.ts', 'src/**/*.test.{ts,tsx}'],
     environment: 'jsdom',
@@ -16,13 +21,14 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['shared/**/*.ts', 'src/utils.ts'],
+      include: ['shared/**/*.ts', 'src/utils.ts', 'src/api/**/*.ts'],
       exclude: ['**/*.test.ts'],
       thresholds: {
         lines: 80,
         branches: 75,
         'shared/**': { lines: 90, branches: 85 },
         'src/utils.ts': { lines: 90, branches: 85 },
+        'src/api/**': { lines: 90, branches: 85 },
       },
     },
   },
