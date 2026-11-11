@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
-import { ZodError } from 'zod'
+import { z, ZodError } from 'zod'
 import { GoalsSchema } from '@shared/schemas'
 import { GOALS } from '../test/handlers'
 import { server } from '../test/setup'
@@ -49,6 +49,18 @@ describe('apiRequest', () => {
     const error = await apiRequest('/goals', GoalsSchema).catch((caught: unknown) => caught)
     expect(error).toBeInstanceOf(ApiError)
     expect(error).toMatchObject({ status: 502, title: 'Bad Gateway', detail: undefined })
+  })
+
+  it('resolves a 204 response with no body', async () => {
+    server.use(http.post('/api/v1/auth/logout', () => new HttpResponse(null, { status: 204 })))
+    await expect(
+      apiRequest('/auth/logout', z.undefined(), { method: 'POST' }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('rejects a body that is not JSON', async () => {
+    server.use(http.get('/api/v1/goals', () => new HttpResponse('<html>', { status: 200 })))
+    await expect(apiRequest('/goals', GoalsSchema)).rejects.toThrow(SyntaxError)
   })
 
   it('rejects a malformed response', async () => {
