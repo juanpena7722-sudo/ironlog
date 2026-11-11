@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/react-query'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
@@ -87,5 +88,52 @@ describe('logout', () => {
       'textContent',
       'Something went wrong. Please try again.',
     )
+  })
+})
+
+describe('session expiry', () => {
+  function expectLoggedOut(queryClient: QueryClient) {
+    expect(queryClient.getQueryData(SESSION_KEY)).toBeNull()
+    const observed = queryClient.getQueryCache().findAll({ type: 'active' })
+    expect(observed.map((query) => query.queryKey)).toEqual([SESSION_KEY])
+  }
+
+  it('sends the user to login when a data query returns 401', async () => {
+    server.use(http.get('/api/v1/workouts', () => NOT_AUTHENTICATED.clone()))
+    const queryClient = renderApp('/workouts')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Log in' })).toBeDefined()
+    expectLoggedOut(queryClient)
+  })
+
+  it('sends the user to login when a mutation returns 401', async () => {
+    server.use(http.put('/api/v1/health-entries/:date', () => NOT_AUTHENTICATED.clone()))
+    const queryClient = renderApp('/health')
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Save day' }))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Log in' })).toBeDefined()
+    expectLoggedOut(queryClient)
+  })
+
+  it('starts the next session without the previous user data', async () => {
+    let isExpired = true
+    server.use(
+      http.get('/api/v1/workouts', () =>
+        isExpired ? NOT_AUTHENTICATED.clone() : HttpResponse.json([]),
+      ),
+      http.post('/api/v1/auth/login', () => HttpResponse.json(USER)),
+    )
+    const queryClient = renderApp('/workouts')
+    await screen.findByRole('heading', { level: 1, name: 'Log in' })
+    queryClient.setQueryData(['workouts', 'from=2026-01-01'], [])
+    isExpired = false
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Email'), USER.email)
+    await user.type(screen.getByLabelText('Password'), 'correct horse{Enter}')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Workouts' })).toBeDefined()
+    expect(queryClient.getQueryData(['workouts', 'from=2026-01-01'])).toBeUndefined()
   })
 })

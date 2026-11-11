@@ -1,5 +1,23 @@
 # Changelog
 
+## TF04 — Data layer on the API (kg canonical) (2026-11-11)
+
+- Changed: `src/store.tsx` reads and writes through the API with TanStack Query hooks
+  (`useWorkouts`, `useFoods`, `useRecentFoods`, `useBody`, `useHealth`, `useGoals`) and
+  mutations; `StoreProvider`, `useStore` and `localStorage` persistence are removed.
+- Added: `src/units.ts` (`toDisplayWeight`, `fromDisplayWeight`, `toDisplayLength`,
+  `fromDisplayLength`). Data is stored in kg and cm and shown in the user's unit, `Goals.unit`,
+  which is stored by the API.
+- Added: `createQueryClient` in `src/api/auth.ts`: a 401 from any data query or mutation ends the
+  session and clears the cached data.
+- Changed: Settings export uses `GET /backup`; import, demo data and **Clear all logs** use
+  `POST /backup/import?mode=replace`. **Clear all logs** keeps the saved goals and is disabled
+  until they load.
+- Fixed: the Vite dev proxy kept `changeOrigin` on, so the API rejected every `POST` from
+  `npm run dev` with 403; it now keeps the browser's `Host` header.
+- Added: `src/test/mockApi.ts` (`mockCollection`, `mockGoals`), page tests for list, create, edit
+  and delete, `src/units.test.ts` and session-expiry tests; coverage includes `src/units.ts`.
+
 ## TF03 — Auth screens and protected routes (2026-11-11)
 
 - Added: `/login` and `/register` pages (`src/pages/Auth.tsx`) validated with the shared schemas,

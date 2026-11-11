@@ -1,7 +1,16 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { useStore } from '../store'
+import {
+  DEFAULT_GOALS,
+  useBody,
+  useFoods,
+  useGoals,
+  useHealth,
+  useRecentFoods,
+  useWorkouts,
+} from '../store'
+import type { BodyEntry, FoodEntry, HealthEntry, Workout } from '../types'
 import { Card, Empty, Meter, PageHead, Stat, chart } from '../components/ui'
 import {
   byDateAsc,
@@ -9,27 +18,37 @@ import {
   daysAgo,
   fmtDate,
   fmtLongDate,
-  round,
   today,
   totals,
   weekStart,
   workoutVolume,
 } from '../utils'
+import { toDisplayWeight } from '../units'
+
+const NO_WORKOUTS: Workout[] = []
+const NO_FOODS: FoodEntry[] = []
+const NO_BODY: BodyEntry[] = []
+const NO_HEALTH: HealthEntry[] = []
 
 export default function Dashboard() {
-  const { data } = useStore()
-  const g = data.goals
   const t = today()
+  const g = useGoals().data ?? DEFAULT_GOALS
+  const workouts = useWorkouts().data ?? NO_WORKOUTS
+  const foods = useFoods({ from: t, to: t }).data ?? NO_FOODS
+  const hasFoods = Boolean(useRecentFoods().data?.length)
+  const bodyEntries = useBody().data ?? NO_BODY
+  const healthEntries = useHealth().data ?? NO_HEALTH
+  const weight = (kg: number) => toDisplayWeight(kg, g.unit)
 
-  const food = totals(data.foods.filter((f) => f.date === t))
-  const health = data.health.find((h) => h.date === t)
-  const body = useMemo(() => [...data.body].sort(byDateAsc), [data.body])
+  const food = totals(foods)
+  const health = healthEntries.find((h) => h.date === t)
+  const body = useMemo(() => [...bodyEntries].sort(byDateAsc), [bodyEntries])
   const latest = body.at(-1)
   const weekAgo = [...body].reverse().find((b) => b.date <= daysAgo(7))
 
-  const thisWeek = data.workouts.filter((w) => weekStart(w.date) === weekStart(t))
+  const thisWeek = workouts.filter((w) => weekStart(w.date) === weekStart(t))
   const weekVolume = thisWeek.reduce((s, w) => s + workoutVolume(w), 0)
-  const recentWorkouts = [...data.workouts].sort(byDateDesc).slice(0, 4)
+  const recentWorkouts = [...workouts].sort(byDateDesc).slice(0, 4)
 
   const muscleSets = useMemo(() => {
     const m = new Map<string, number>()
@@ -42,11 +61,10 @@ export default function Dashboard() {
 
   const weightSeries = body
     .filter((b) => b.date > daysAgo(60))
-    .map((b) => ({ label: fmtDate(b.date), weight: b.weight }))
-  const weightDelta = latest && weekAgo ? round(latest.weight - weekAgo.weight) : undefined
+    .map((b) => ({ label: fmtDate(b.date), weight: weight(b.weight) }))
+  const weightDelta = latest && weekAgo ? weight(latest.weight - weekAgo.weight) : undefined
 
-  const isEmpty =
-    !data.workouts.length && !data.foods.length && !data.body.length && !data.health.length
+  const isEmpty = !workouts.length && !hasFoods && !bodyEntries.length && !healthEntries.length
 
   return (
     <>
@@ -67,7 +85,7 @@ export default function Dashboard() {
       <div className="stats">
         <Stat
           label="Bodyweight"
-          value={latest ? `${latest.weight} ${g.unit}` : '—'}
+          value={latest ? `${weight(latest.weight)} ${g.unit}` : '—'}
           sub={
             weightDelta !== undefined
               ? `${weightDelta > 0 ? '+' : ''}${weightDelta} ${g.unit} this week`
@@ -77,7 +95,7 @@ export default function Dashboard() {
         <Stat
           label="Sessions this week"
           value={thisWeek.length}
-          sub={`${Math.round(weekVolume).toLocaleString()} ${g.unit} volume`}
+          sub={`${Math.round(weight(weekVolume)).toLocaleString()} ${g.unit} volume`}
         />
         <Stat
           label="Calories today"
@@ -189,8 +207,8 @@ export default function Dashboard() {
                     <strong>{w.name}</strong> <span className="muted small">{fmtDate(w.date)}</span>
                   </span>
                   <span className="muted small">
-                    {w.exercises.length} ex · {Math.round(workoutVolume(w)).toLocaleString()}{' '}
-                    {g.unit}
+                    {w.exercises.length} ex ·{' '}
+                    {Math.round(weight(workoutVolume(w))).toLocaleString()} {g.unit}
                   </span>
                 </li>
               ))}

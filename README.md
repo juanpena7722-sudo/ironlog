@@ -11,7 +11,8 @@ A web app for bodybuilders to track workouts, diet, body progress and health.
 - **Health:** sleep, water, resting HR, steps, energy and notes
 - **Settings:** targets, kg/lb units, macro suggestions, JSON backup export/import, demo data
 
-All data is currently stored locally in the browser (localStorage).
+Data is stored per user account through the API (`/api/v1`) in PostgreSQL, including the kg/lb
+unit preference.
 
 ## Tech stack
 

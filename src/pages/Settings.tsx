@@ -1,18 +1,42 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { DeleteAccountSchema } from '@shared/schemas'
+import { AppDataSchema, DeleteAccountSchema } from '@shared/schemas'
 import { errorMessage, useDeleteAccount } from '../api/auth'
-import { useStore } from '../store'
+import { apiRequest } from '../api/client'
+import {
+  DEFAULT_GOALS,
+  normalize,
+  useBody,
+  useFoods,
+  useGoals,
+  useHealth,
+  useReplaceData,
+  useSaveGoals,
+  useWorkouts,
+} from '../store'
 import type { AppData, Goals } from '../types'
 import { Card, Field, PageHead } from '../components/ui'
 import { makeDemoData } from '../demo'
 import { byDateAsc, round } from '../utils'
+import { fromDisplayWeight, toDisplayWeight } from '../units'
 
 type Pending = 'reset' | 'demo' | null
 
 export default function Settings() {
-  const { data, setGoals, replaceAll } = useStore()
-  const [goals, setLocal] = useState<Goals>(data.goals)
+  const saved = useGoals().data
+  const workouts = useWorkouts().data ?? []
+  const foods = useFoods().data ?? []
+  const body = useBody().data ?? []
+  const health = useHealth().data ?? []
+  const saveGoals = useSaveGoals()
+  const replaceData = useReplaceData()
+  // targetWeight is in the display unit here. Until edited, the form shows the saved goals.
+  const [edited, setLocal] = useState<Goals | null>(null)
+  const current = saved ?? DEFAULT_GOALS
+  const goals = edited ?? {
+    ...current,
+    targetWeight: toDisplayWeight(current.targetWeight, current.unit),
+  }
   const [msg, setMsg] = useState('')
   const [pending, setPending] = useState<Pending>(null)
   const [exportText, setExportText] = useState('')
@@ -21,7 +45,7 @@ export default function Settings() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [passwordError, setPasswordError] = useState<string>()
 
-  const latestWeight = [...data.body].sort(byDateAsc).at(-1)?.weight
+  const latestWeight = [...body].sort(byDateAsc).at(-1)?.weight
   const flash = (m: string) => {
     setMsg(m)
     setTimeout(() => setMsg(''), 3000)
@@ -35,23 +59,29 @@ export default function Settings() {
 
   const save = (e: FormEvent) => {
     e.preventDefault()
-    setGoals(goals)
-    flash('Targets saved.')
+    saveGoals.mutate(
+      { ...goals, targetWeight: fromDisplayWeight(goals.targetWeight, goals.unit) },
+      {
+        onSuccess: () => {
+          setLocal(null)
+          flash('Targets saved.')
+        },
+      },
+    )
   }
 
   // Common bodybuilding starting point: ~2.2 g/kg protein, ~0.9 g/kg fat, rest carbs.
   const suggest = () => {
     if (!latestWeight) return
-    const kg = goals.unit === 'kg' ? latestWeight : latestWeight / 2.2046
-    const protein = Math.round(kg * 2.2)
-    const fat = Math.round(kg * 0.9)
+    const protein = Math.round(latestWeight * 2.2)
+    const fat = Math.round(latestWeight * 0.9)
     const carbs = Math.max(0, Math.round((goals.calories - protein * 4 - fat * 9) / 4))
     setLocal({ ...goals, protein, fat, carbs })
   }
 
   const macroKcal = goals.protein * 4 + goals.carbs * 4 + goals.fat * 9
 
-  const doExport = () => {
+  const download = (data: AppData) => {
     const json = JSON.stringify(data, null, 2)
     try {
       const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
@@ -68,13 +98,18 @@ export default function Settings() {
     }
   }
 
+  const doExport = () =>
+    apiRequest('/backup', AppDataSchema).then(download, (error: Error) =>
+      flash(errorMessage(error)),
+    )
+
   const doImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     try {
       const parsed = JSON.parse(await file.text()) as AppData
-      replaceAll(parsed)
-      setLocal({ ...data.goals, ...parsed.goals })
+      await replaceData.mutateAsync(normalize(parsed))
+      setLocal(null)
       flash('Data imported.')
     } catch {
       flash('That file is not a valid IronLog backup.')
@@ -83,14 +118,19 @@ export default function Settings() {
   }
 
   const confirm = () => {
-    if (pending === 'reset') {
-      replaceAll({ version: 1, workouts: [], foods: [], body: [], health: [], goals: data.goals })
-      flash('All logs cleared.')
+    // Clearing keeps the saved goals, so it waits until they have loaded.
+    if (pending === 'reset' && saved) {
+      replaceData.mutate(
+        { version: 1, workouts: [], foods: [], body: [], health: [], goals: saved },
+        { onSuccess: () => flash('All logs cleared.') },
+      )
     } else if (pending === 'demo') {
-      const demo = makeDemoData()
-      replaceAll(demo)
-      setLocal(demo.goals)
-      flash('Demo data loaded.')
+      replaceData.mutate(makeDemoData(), {
+        onSuccess: () => {
+          setLocal(null)
+          flash('Demo data loaded.')
+        },
+      })
     }
     setPending(null)
   }
@@ -129,7 +169,11 @@ export default function Settings() {
                 Units
                 <select
                   value={goals.unit}
-                  onChange={(e) => setLocal({ ...goals, unit: e.target.value as Goals['unit'] })}
+                  onChange={(e) => {
+                    const unit = e.target.value as Goals['unit']
+                    const kg = fromDisplayWeight(goals.targetWeight, goals.unit)
+                    setLocal({ ...goals, unit, targetWeight: toDisplayWeight(kg, unit) })
+                  }}
                 >
                   <option value="kg">kg / cm</option>
                   <option value="lb">lb / in</option>
@@ -163,7 +207,9 @@ export default function Settings() {
               {round(macroKcal - goals.calories, 0)} vs calorie target).
             </p>
             <div className="actions">
-              <button type="submit">Save targets</button>
+              <button type="submit" disabled={!saved}>
+                Save targets
+              </button>
               <button
                 type="button"
                 className="ghost"
@@ -179,12 +225,11 @@ export default function Settings() {
 
         <Card title="Your data">
           <p className="muted small">
-            Everything is stored in this browser only. Export a backup regularly, especially before
-            clearing site data.
+            Everything is stored in your account. Export a backup regularly.
           </p>
           <p className="small">
-            {data.workouts.length} workouts · {data.foods.length} food entries · {data.body.length}{' '}
-            check-ins · {data.health.length} health logs
+            {workouts.length} workouts · {foods.length} food entries · {body.length} check-ins ·{' '}
+            {health.length} health logs
           </p>
           <div className="actions">
             <button className="ghost" onClick={doExport}>
@@ -205,7 +250,7 @@ export default function Settings() {
             <button className="ghost" onClick={() => setPending('demo')}>
               Load demo data
             </button>
-            <button className="ghost danger" onClick={() => setPending('reset')}>
+            <button className="ghost danger" disabled={!saved} onClick={() => setPending('reset')}>
               Clear all logs
             </button>
           </div>
@@ -218,7 +263,11 @@ export default function Settings() {
                 This can’t be undone.
               </p>
               <div className="actions">
-                <button className="danger-solid" onClick={confirm}>
+                <button
+                  className="danger-solid"
+                  disabled={pending === 'reset' && !saved}
+                  onClick={confirm}
+                >
                   Yes, continue
                 </button>
                 <button className="ghost" onClick={() => setPending(null)}>

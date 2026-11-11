@@ -19,5 +19,8 @@ export const GOALS: Goals = {
 
 export const handlers = [
   http.get('/api/v1/goals', () => HttpResponse.json(GOALS)),
+  ...['workouts', 'foods', 'foods/recent', 'body', 'health-entries'].map((path) =>
+    http.get(`/api/v1/${path}`, () => HttpResponse.json([])),
+  ),
   http.get('/api/v1/auth/me', () => HttpResponse.json(USER)),
 ]

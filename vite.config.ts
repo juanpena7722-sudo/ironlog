@@ -11,7 +11,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:3000',
+      // The string shorthand sets changeOrigin, so the API would see a Host that differs from Origin.
+      '/api': { target: 'http://localhost:3000' },
     },
   },
   test: {
@@ -21,13 +22,14 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['shared/**/*.ts', 'src/utils.ts', 'src/api/**/*.ts'],
+      include: ['shared/**/*.ts', 'src/utils.ts', 'src/units.ts', 'src/api/**/*.ts'],
       exclude: ['**/*.test.ts'],
       thresholds: {
         lines: 80,
         branches: 75,
         'shared/**': { lines: 90, branches: 85 },
         'src/utils.ts': { lines: 90, branches: 85 },
+        'src/units.ts': { lines: 90, branches: 85 },
         'src/api/**': { lines: 90, branches: 85 },
       },
     },

@@ -1,15 +1,207 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { delay, http, HttpResponse } from 'msw'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SESSION_KEY } from '../api/auth'
+import type { AppData, BodyEntry } from '../types'
+import { GOALS } from '../test/handlers'
+import { mockCollection, mockGoals } from '../test/mockApi'
 import { renderApp, renderWithProviders } from '../test/render'
 import { server } from '../test/setup'
 import Settings from './Settings'
 
-it('Settings page renders', () => {
-  renderWithProviders(<Settings />)
-  expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeDefined()
+const CHECK_IN: BodyEntry = {
+  id: '4e2d9c1b-7a6f-4b3e-9d2c-1a0b9c8d7e6f',
+  date: '2026-03-02',
+  weight: 90,
+}
+
+describe('targets', () => {
+  it('shows the saved goals and saves edits', async () => {
+    const saved = mockGoals(GOALS)
+    renderWithProviders(<Settings />)
+    const user = userEvent.setup()
+
+    const calories = await screen.findByLabelText('Calories (kcal)')
+    await waitFor(() => expect(calories).toHaveProperty('value', '2500'))
+    await user.clear(calories)
+    await user.type(calories, '3000')
+    await user.click(screen.getByRole('button', { name: 'Save targets' }))
+
+    expect(await screen.findByText('Targets saved.')).toBeDefined()
+    expect(saved).toEqual([{ ...GOALS, calories: 3000 }])
+  })
+
+  it('shows the target weight in lb and saves it in kg', async () => {
+    const saved = mockGoals({ ...GOALS, unit: 'lb' })
+    renderWithProviders(<Settings />)
+    const user = userEvent.setup()
+
+    const target = await screen.findByLabelText('Target weight (lb)')
+    await waitFor(() => expect(target).toHaveProperty('value', '176.4'))
+    await user.clear(target)
+    await user.type(target, '200')
+    await user.click(screen.getByRole('button', { name: 'Save targets' }))
+
+    await screen.findByText('Targets saved.')
+    expect(saved[0]).toMatchObject({ unit: 'lb', targetWeight: 90.72 })
+  })
+
+  it('converts the target weight when switching units', async () => {
+    mockGoals(GOALS)
+    renderWithProviders(<Settings />)
+    const user = userEvent.setup()
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Target weight (kg)')).toHaveProperty('value', '80'),
+    )
+    await user.selectOptions(screen.getByLabelText('Units'), 'lb')
+
+    expect(screen.getByLabelText('Target weight (lb)')).toHaveProperty('value', '176.4')
+  })
+
+  it('suggests macros from the latest bodyweight in kg', async () => {
+    mockGoals({ ...GOALS, unit: 'lb' })
+    mockCollection('body', [CHECK_IN])
+    renderWithProviders(<Settings />)
+    const user = userEvent.setup()
+
+    const suggest = screen.getByRole('button', { name: 'Suggest macros from bodyweight' })
+    await waitFor(() => expect(suggest).toHaveProperty('disabled', false))
+    await user.click(suggest)
+
+    expect(screen.getByLabelText('Protein (g)')).toHaveProperty('value', '198')
+    expect(screen.getByLabelText('Fat (g)')).toHaveProperty('value', '81')
+  })
+})
+
+describe('your data', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  const BACKUP: AppData = {
+    version: 1,
+    workouts: [],
+    foods: [],
+    body: [CHECK_IN],
+    health: [],
+    goals: GOALS,
+  }
+
+  function mockImport() {
+    const imports: { search: string; body: unknown }[] = []
+    server.use(
+      http.post('/api/v1/backup/import', async ({ request }) => {
+        imports.push({ search: new URL(request.url).search, body: await request.json() })
+        return HttpResponse.json({ imported: {}, skipped: {} })
+      }),
+    )
+    return imports
+  }
+
+  it('counts the stored data', async () => {
+    mockCollection('body', [CHECK_IN])
+    renderWithProviders(<Settings />)
+
+    expect(
+      await screen.findByText('0 workouts · 0 food entries · 1 check-ins · 0 health logs'),
+    ).toBeDefined()
+  })
+
+  it('downloads the backup from the API', async () => {
+    server.use(http.get('/api/v1/backup', () => HttpResponse.json(BACKUP)))
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:backup')
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderWithProviders(<Settings />)
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Export backup' }))
+
+    expect(await screen.findByText('Backup downloaded.')).toBeDefined()
+    expect(click).toHaveBeenCalledOnce()
+    const blob = createObjectURL.mock.calls[0][0] as Blob
+    expect(JSON.parse(await blob.text())).toEqual(BACKUP)
+  })
+
+  it('imports a backup file, replacing the data', async () => {
+    const imports = mockImport()
+    renderWithProviders(<Settings />)
+    const file = new File([JSON.stringify(BACKUP)], 'backup.json', { type: 'application/json' })
+
+    await userEvent
+      .setup()
+      .upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, file)
+
+    expect(await screen.findByText('Data imported.')).toBeDefined()
+    expect(imports).toEqual([{ search: '?mode=replace', body: BACKUP }])
+  })
+
+  it('rejects an invalid backup file', async () => {
+    renderWithProviders(<Settings />)
+    const file = new File(['not json'], 'backup.json', { type: 'application/json' })
+
+    await userEvent
+      .setup()
+      .upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, file)
+
+    expect(await screen.findByText('That file is not a valid IronLog backup.')).toBeDefined()
+  })
+
+  it('loads demo data after confirmation', async () => {
+    const imports = mockImport()
+    renderWithProviders(<Settings />)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Load demo data' }))
+    await user.click(screen.getByRole('button', { name: 'Yes, continue' }))
+
+    expect(await screen.findByText('Demo data loaded.')).toBeDefined()
+    const body = imports[0].body as AppData
+    expect(body.workouts.length).toBeGreaterThan(0)
+    expect(body.body.length).toBeGreaterThan(0)
+  })
+
+  it.each([
+    [
+      'fails',
+      () => HttpResponse.json({ title: 'Internal Server Error', status: 500 }, { status: 500 }),
+      'error',
+    ],
+    ['is still loading', () => delay('infinite'), 'pending'],
+  ])('cannot clear all logs while GET /goals %s', async (_, resolver, status) => {
+    let calls = 0
+    server.use(
+      http.get('/api/v1/goals', resolver),
+      http.post('/api/v1/backup/import', () => {
+        calls += 1
+        return HttpResponse.json({ imported: {}, skipped: {} })
+      }),
+    )
+    const queryClient = renderWithProviders(<Settings />)
+    const clear = screen.getByRole('button', { name: 'Clear all logs' })
+    await waitFor(() => expect(queryClient.getQueryState(['goals'])?.status).toBe(status))
+
+    expect(clear).toHaveProperty('disabled', true)
+    await userEvent.setup().click(clear)
+    expect(screen.queryByRole('button', { name: 'Yes, continue' })).toBeNull()
+    expect(calls).toBe(0)
+  })
+
+  it('clears all logs but keeps the targets', async () => {
+    const imports = mockImport()
+    renderWithProviders(<Settings />)
+    const user = userEvent.setup()
+    await waitFor(() =>
+      expect(screen.getByLabelText('Calories (kcal)')).toHaveProperty('value', '2500'),
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Clear all logs' }))
+    await user.click(screen.getByRole('button', { name: 'Yes, continue' }))
+
+    expect(await screen.findByText('All logs cleared.')).toBeDefined()
+    expect(imports[0]).toEqual({
+      search: '?mode=replace',
+      body: { version: 1, workouts: [], foods: [], body: [], health: [], goals: GOALS },
+    })
+  })
 })
 
 describe('delete account', () => {

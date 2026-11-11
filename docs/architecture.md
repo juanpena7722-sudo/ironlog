@@ -38,6 +38,8 @@ served by the SPA fallback and never reach the API.
 
 In development there is no gateway: the Vite dev server serves the frontend and proxies `/api`
 to the API on `http://localhost:3000` (see [`frontend.md`](./frontend.md#development-proxy)).
+The proxy keeps the browser's `Host` header (no `changeOrigin`), so the API's same-origin check
+sees the same host as the `Origin` header, as it does behind the gateway.
 
 ## Production stack
 
@@ -73,7 +75,12 @@ dependency for this reason.
 - **Single origin.** CORS is disabled; the frontend never knows the API's internal address.
 - **Frontend served from the host.** The gateway bind-mounts `./dist`, so `npm run build` must
   run before the stack starts, and a rebuild is picked up without rebuilding any image.
+- **The API is the only data store.** Every page reads and writes through `/api/v1` with
+  TanStack Query (see [`frontend.md`](./frontend.md#data-layer)); nothing is persisted in the
+  browser. Weights are stored in kg and lengths in cm; the display unit is the user's
+  `Goals.unit`, stored by the API, and the frontend converts for display only
+  (see [`frontend.md`](./frontend.md#units)).
 - **`trustProxy` in production only.** The API trusts `X-Forwarded-For` only when it runs behind
   the gateway, so rate limits count the real client IP.
 
-_Last updated by TF02._
+_Last updated by TF04._

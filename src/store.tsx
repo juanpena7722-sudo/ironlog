@@ -1,8 +1,14 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
-import type { AppData, BodyEntry, FoodEntry, Goals, HealthEntry, Workout } from './types'
-
-const STORAGE_KEY = 'ironlog:data'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { z } from 'zod'
+import {
+  BodyEntrySchema,
+  FoodEntrySchema,
+  GoalsSchema,
+  HealthEntrySchema,
+  WorkoutSchema,
+} from '@shared/schemas'
+import { apiRequest, jsonRequest } from './api/client'
+import type { AppData, BodyEntry, FoodEntry, Goals, HealthEntry, ISODate, Workout } from './types'
 
 export const DEFAULT_GOALS: Goals = {
   unit: 'kg',
@@ -13,25 +19,6 @@ export const DEFAULT_GOALS: Goals = {
   targetWeight: 85,
   waterL: 4,
   sleepHours: 8,
-}
-
-const EMPTY: AppData = {
-  version: 1,
-  workouts: [],
-  foods: [],
-  body: [],
-  health: [],
-  goals: DEFAULT_GOALS,
-}
-
-function load(): AppData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return EMPTY
-    return normalize(JSON.parse(raw))
-  } catch {
-    return EMPTY
-  }
 }
 
 /** Fills in missing fields so older or hand-edited data still loads. */
@@ -46,55 +33,94 @@ export function normalize(input: Partial<AppData>): AppData {
   }
 }
 
-type Collection = 'workouts' | 'foods' | 'body' | 'health'
-type ItemOf<C extends Collection> = AppData[C][number]
+// List endpoints default to recent days only; pages need the whole history.
+const ALL_TIME: ISODate = '1970-01-01'
+const RECENT_FOODS_LIMIT = 12
 
-interface Store {
-  data: AppData
-  upsert: <C extends Collection>(c: C, item: ItemOf<C>) => void
-  remove: (c: Collection, id: string) => void
-  setGoals: (g: Goals) => void
-  replaceAll: (d: AppData) => void
+type DateRange = { from: ISODate; to?: ISODate }
+type Upsert<T> = { id?: string; entry: T }
+
+function listQuery<T>(key: string, path: string, schema: z.ZodType<T>, { from, to }: DateRange) {
+  const search = to ? `from=${from}&to=${to}` : `from=${from}`
+  return {
+    queryKey: [key, search],
+    queryFn: () => apiRequest(`${path}?${search}`, z.array(schema)),
+  }
 }
 
-const Ctx = createContext<Store | null>(null)
+export const useWorkouts = () =>
+  useQuery(listQuery('workouts', '/workouts', WorkoutSchema, { from: ALL_TIME }))
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<AppData>(load)
+export const useFoods = (range: DateRange = { from: ALL_TIME }) =>
+  useQuery(listQuery('foods', '/foods', FoodEntrySchema, range))
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    } catch {
-      // storage full or unavailable; keep working in memory
-    }
-  }, [data])
+export const useRecentFoods = () =>
+  useQuery({
+    queryKey: ['foods', 'recent'],
+    queryFn: () =>
+      apiRequest(`/foods/recent?limit=${RECENT_FOODS_LIMIT}`, z.array(FoodEntrySchema)),
+  })
 
-  const store = useMemo<Store>(
-    () => ({
-      data,
-      upsert: (c, item) =>
-        setData((d) => {
-          const list = d[c] as { id: string }[]
-          const exists = list.some((x) => x.id === item.id)
-          const next = exists ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]
-          return { ...d, [c]: next }
-        }),
-      remove: (c, id) =>
-        setData((d) => ({ ...d, [c]: (d[c] as { id: string }[]).filter((x) => x.id !== id) })),
-      setGoals: (goals) => setData((d) => ({ ...d, goals })),
-      replaceAll: (d) => setData(normalize(d)),
-    }),
-    [data],
+export const useBody = () =>
+  useQuery(listQuery('body', '/body', BodyEntrySchema, { from: ALL_TIME }))
+
+export const useHealth = () =>
+  useQuery(listQuery('health', '/health-entries', HealthEntrySchema, { from: ALL_TIME }))
+
+export const useGoals = () =>
+  useQuery({ queryKey: ['goals'], queryFn: () => apiRequest('/goals', GoalsSchema) })
+
+function useApiMutation<V>(key: string, mutationFn: (variables: V) => Promise<unknown>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [key] }),
+  })
+}
+
+function save<T>(path: string, schema: z.ZodType<T>, { id, entry }: Upsert<T>) {
+  return id
+    ? apiRequest(`${path}/${id}`, schema, jsonRequest('PUT', entry))
+    : apiRequest(path, schema, jsonRequest('POST', entry))
+}
+
+const remove = (path: string) => apiRequest(path, z.undefined(), { method: 'DELETE' })
+
+export const useSaveWorkout = () =>
+  useApiMutation('workouts', (upsert: Upsert<Workout>) => save('/workouts', WorkoutSchema, upsert))
+
+export const useDeleteWorkout = () =>
+  useApiMutation('workouts', (id: string) => remove(`/workouts/${id}`))
+
+export const useAddFood = () =>
+  useApiMutation('foods', (entry: FoodEntry) => save('/foods', FoodEntrySchema, { entry }))
+
+export const useDeleteFood = () => useApiMutation('foods', (id: string) => remove(`/foods/${id}`))
+
+export const useSaveBody = () =>
+  useApiMutation('body', (upsert: Upsert<BodyEntry>) => save('/body', BodyEntrySchema, upsert))
+
+export const useDeleteBody = () => useApiMutation('body', (id: string) => remove(`/body/${id}`))
+
+export const useSaveHealth = () =>
+  useApiMutation('health', (entry: HealthEntry) =>
+    apiRequest(`/health-entries/${entry.date}`, HealthEntrySchema, jsonRequest('PUT', entry)),
   )
 
-  return <Ctx.Provider value={store}>{children}</Ctx.Provider>
-}
+export const useDeleteHealth = () =>
+  useApiMutation('health', (date: ISODate) => remove(`/health-entries/${date}`))
 
-export function useStore(): Store {
-  const s = useContext(Ctx)
-  if (!s) throw new Error('useStore must be used inside StoreProvider')
-  return s
-}
+export const useSaveGoals = () =>
+  useApiMutation('goals', (goals: Goals) =>
+    apiRequest('/goals', GoalsSchema, jsonRequest('PUT', goals)),
+  )
 
-export type { Workout, FoodEntry, BodyEntry, HealthEntry }
+export function useReplaceData() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    // The import summary is not shown, so its body is not parsed.
+    mutationFn: (data: AppData) =>
+      apiRequest('/backup/import?mode=replace', z.unknown(), jsonRequest('POST', data)),
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+}

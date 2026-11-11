@@ -1,9 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { UserSchema } from '@shared/schemas'
 import type { Credentials } from '@shared/schemas'
-import { ApiError, apiRequest } from './client'
+import { ApiError, apiRequest, jsonRequest } from './client'
 
 export const SESSION_KEY = ['session']
 
@@ -16,8 +23,32 @@ async function fetchSession() {
   }
 }
 
-function jsonRequest(method: string, body: unknown): RequestInit {
-  return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+// A page still mounted when the session ends can refill the cache, so sign-in clears it again.
+function removeUserData(queryClient: QueryClient) {
+  queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== SESSION_KEY[0] })
+}
+
+// Login and account deletion answer a wrong password with 401 while the session is still valid.
+const CREDENTIAL_CHECK = { isCredentialCheck: true }
+
+export function createQueryClient(
+  retry: false | ((failureCount: number, error: Error) => boolean),
+): QueryClient {
+  const endExpiredSession = (error: Error) => {
+    if (!(error instanceof ApiError) || error.status !== 401) return
+    queryClient.setQueryData(SESSION_KEY, null)
+    removeUserData(queryClient)
+  }
+  const queryClient = new QueryClient({
+    queryCache: new QueryCache({ onError: endExpiredSession }),
+    mutationCache: new MutationCache({
+      onError: (error, _variables, _context, mutation) => {
+        if (!mutation.meta?.isCredentialCheck) endExpiredSession(error)
+      },
+    }),
+    defaultOptions: { queries: { retry } },
+  })
+  return queryClient
 }
 
 export function useSession() {
@@ -29,7 +60,11 @@ export function useSignIn(mode: 'login' | 'register') {
   return useMutation({
     mutationFn: (credentials: Credentials) =>
       apiRequest(`/auth/${mode}`, UserSchema, jsonRequest('POST', credentials)),
-    onSuccess: (user) => queryClient.setQueryData(SESSION_KEY, user),
+    meta: CREDENTIAL_CHECK,
+    onSuccess: (user) => {
+      removeUserData(queryClient)
+      queryClient.setQueryData(SESSION_KEY, user)
+    },
   })
 }
 
@@ -56,6 +91,7 @@ export function useDeleteAccount() {
   return useMutation({
     mutationFn: (password: string) =>
       apiRequest('/auth/account', z.undefined(), jsonRequest('DELETE', { password })),
+    meta: CREDENTIAL_CHECK,
     onSuccess: endSession,
   })
 }
