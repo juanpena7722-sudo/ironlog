@@ -1,5 +1,18 @@
 # Changelog
 
+## TF02 — API client and TanStack Query (2026-11-11)
+
+- Added: dependency `@tanstack/react-query` (v5); `src/main.tsx` wraps the app in
+  `QueryClientProvider`, with queries retried once on 5xx only (`shouldRetry`).
+- Added: `src/api/client.ts` with `apiRequest` (fixed same-origin base `/api/v1`,
+  `credentials: 'same-origin'`, responses validated with shared Zod schemas) and `ApiError`
+  (`status`, `title`, `detail`) parsed from Problem Details.
+- Added: Vite dev proxy from `/api` to `http://localhost:3000`.
+- Added: `src/test/handlers.ts` (default MSW handlers) and `src/api/client.test.ts`.
+- Changed: `src/test/setup.ts` loads the default handlers and exports `server`; coverage also
+  measures `src/api/**` (90 % lines / 85 % branches).
+- Added: `docs/frontend.md`.
+
 ## TF01 — Frontend test harness and existing-logic tests (2026-11-11)
 
 - Added: dev dependencies `@testing-library/react`, `@testing-library/dom`,

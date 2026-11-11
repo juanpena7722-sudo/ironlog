@@ -15,7 +15,7 @@ npm run dev
 
 | Script                  | What it does                                                                                    |
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
-| `npm run dev`           | Starts the Vite dev server.                                                                     |
+| `npm run dev`           | Starts the Vite dev server; requests under `/api` are proxied to `http://localhost:3000`.       |
 | `npm run build`         | Type-checks (`tsc -b`) and builds to `dist/`.                                                   |
 | `npm run preview`       | Serves the built `dist/` locally.                                                               |
 | `npm run lint`          | Runs ESLint on the repo (`eslint-config-prettier` turns off rules that conflict with Prettier). |
@@ -210,4 +210,4 @@ npm audit --omit=dev --audit-level=high
 
 The audit steps fail only on high or critical advisories in production dependencies.
 
-_Last updated by TB09._
+_Last updated by TF02._

@@ -36,7 +36,8 @@ The gateway sets these headers on every response, including proxied API response
 overwrite the values from `@fastify/helmet`. Paths outside `/api/v1/*`, such as `/docs`, are
 served by the SPA fallback and never reach the API.
 
-In development there is no gateway: the Vite dev server serves the frontend.
+In development there is no gateway: the Vite dev server serves the frontend and proxies `/api`
+to the API on `http://localhost:3000` (see [`frontend.md`](./frontend.md#development-proxy)).
 
 ## Production stack
 
@@ -75,4 +76,4 @@ dependency for this reason.
 - **`trustProxy` in production only.** The API trusts `X-Forwarded-For` only when it runs behind
   the gateway, so rate limits count the real client IP.
 
-_Last updated by TB09._
+_Last updated by TF02._
