@@ -61,7 +61,7 @@ Releases (versioning, tags, deployment) are decided and triggered by the owner o
 3. No UI or behaviour change.
 4. CI passes on GitHub.
 
-### [?] TF01 — Frontend test harness and existing-logic tests
+### [x] TF01 — Frontend test harness and existing-logic tests
 
 **Branch:** `test/tf01-test-harness`
 
