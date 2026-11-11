@@ -1,5 +1,18 @@
 # Changelog
 
+## TF01 — Frontend test harness and existing-logic tests (2026-11-11)
+
+- Added: dev dependencies `@testing-library/react`, `@testing-library/dom`,
+  `@testing-library/user-event`, `jsdom` and `msw` (v2).
+- Added: `src/test/setup.ts` (MSW server that rejects unhandled requests, cleanup,
+  `localStorage` reset, `ResizeObserver` stub); frontend tests run in `jsdom`.
+- Added: unit tests for every export of `src/utils.ts` and for `normalize()`, a smoke test per
+  page and a lazy-loading test for every route.
+- Changed: `src/App.tsx` lazy-loads the six route pages with `React.lazy` and `Suspense`; each
+  page builds as its own chunk.
+- Changed: coverage now measures `src/utils.ts` (90 % lines / 85 % branches); `normalize` is
+  exported from `src/store.tsx`.
+
 ## TB09 — Hardening, gateway and production stack (2026-11-11)
 
 - Added: `@fastify/helmet` (default CSP), a global rate limit of 300 requests per minute per IP,
