@@ -130,6 +130,32 @@ export const GoalsSchema = z.object({
   sleepHours: z.number().min(0).max(24),
 })
 
+const EMAIL_MAX = 254
+const PASSWORD_MIN = 10
+const PASSWORD_MAX = 128
+
+const emailSchema = textSchema
+  .trim()
+  .toLowerCase()
+  .pipe(z.email('Enter a valid email address').max(EMAIL_MAX, 'Email is too long'))
+const passwordSchema = textSchema
+  .min(1, 'Enter your password')
+  .max(PASSWORD_MAX, `Password must be at most ${PASSWORD_MAX} characters`)
+
+export const LoginSchema = z.object({ email: emailSchema, password: passwordSchema })
+
+export const RegisterSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema.min(
+    PASSWORD_MIN,
+    `Password must be at least ${PASSWORD_MIN} characters`,
+  ),
+})
+
+export const DeleteAccountSchema = z.object({ password: passwordSchema })
+
+export const UserSchema = z.object({ id: z.uuid(), email: z.string() })
+
 export const AppDataSchema = z.object({
   version: z.literal(1),
   workouts: z.array(WorkoutSchema),
@@ -149,3 +175,5 @@ export type BodyEntry = z.infer<typeof BodyEntrySchema>
 export type HealthEntry = z.infer<typeof HealthEntrySchema>
 export type Goals = z.infer<typeof GoalsSchema>
 export type AppData = z.infer<typeof AppDataSchema>
+export type Credentials = z.infer<typeof LoginSchema>
+export type User = z.infer<typeof UserSchema>

@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
+import { DeleteAccountSchema } from '@shared/schemas'
+import { errorMessage, useDeleteAccount } from '../api/auth'
 import { useStore } from '../store'
 import type { AppData, Goals } from '../types'
-import { Card, PageHead } from '../components/ui'
+import { Card, Field, PageHead } from '../components/ui'
 import { makeDemoData } from '../demo'
 import { byDateAsc, round } from '../utils'
 
@@ -15,6 +17,9 @@ export default function Settings() {
   const [pending, setPending] = useState<Pending>(null)
   const [exportText, setExportText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const deleteAccount = useDeleteAccount()
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [passwordError, setPasswordError] = useState<string>()
 
   const latestWeight = [...data.body].sort(byDateAsc).at(-1)?.weight
   const flash = (m: string) => {
@@ -88,6 +93,27 @@ export default function Settings() {
       flash('Demo data loaded.')
     }
     setPending(null)
+  }
+
+  const submitDelete = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const result = DeleteAccountSchema.safeParse({
+      password: new FormData(e.currentTarget).get('password'),
+    })
+    if (!result.success) {
+      setPasswordError(result.error.issues[0].message)
+      const input = e.currentTarget.elements.namedItem('password')
+      if (input instanceof HTMLInputElement) input.focus()
+      return
+    }
+    setPasswordError(undefined)
+    deleteAccount.mutate(result.data.password)
+  }
+
+  const cancelDelete = () => {
+    setIsDeleting(false)
+    setPasswordError(undefined)
+    deleteAccount.reset()
   }
 
   return (
@@ -209,6 +235,42 @@ export default function Settings() {
               value={exportText}
               onFocus={(e) => e.target.select()}
             />
+          )}
+        </Card>
+
+        <Card title="Account">
+          {isDeleting ? (
+            <form className="confirm" onSubmit={submitDelete} noValidate>
+              <p>
+                Permanently delete your account and all of its data? This can’t be undone. Enter
+                your password to confirm.
+              </p>
+              <Field
+                label="Password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                autoFocus
+                error={passwordError}
+              />
+              {deleteAccount.error && (
+                <p role="alert" className="field-error">
+                  {errorMessage(deleteAccount.error)}
+                </p>
+              )}
+              <div className="actions">
+                <button type="submit" className="danger-solid" disabled={deleteAccount.isPending}>
+                  Delete my account
+                </button>
+                <button type="button" className="ghost" onClick={cancelDelete}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button type="button" className="ghost danger" onClick={() => setIsDeleting(true)}>
+              Delete account
+            </button>
           )}
         </Card>
       </div>

@@ -1,5 +1,22 @@
 # Changelog
 
+## TF03 — Auth screens and protected routes (2026-11-11)
+
+- Added: `/login` and `/register` pages (`src/pages/Auth.tsx`) validated with the shared schemas,
+  with the server's `detail` shown inline.
+- Added: `src/api/auth.ts` with `useSession` (`GET /auth/me`, `null` on 401), `useSignIn`,
+  `useLogout`, `useDeleteAccount` and `errorMessage`.
+- Added: `ProtectedShell` in `src/App.tsx`: without a session every page redirects to `/login`
+  and returns to the original page after sign-in; **Log out** in the navigation.
+- Added: **Account** card in Settings to delete the account after confirmation and the password.
+  Logout and account deletion clear the query cache and the session.
+- Added: `Field` component in `src/components/ui.tsx`; `src/test/render.tsx` helpers; default
+  MSW handler for `GET /api/v1/auth/me`.
+- Changed: `LoginSchema`, `RegisterSchema`, `DeleteAccountSchema` and `UserSchema` live in
+  `shared/schemas.ts` and `server/src/auth.ts` uses them; the auth 400 `errors` messages are now
+  readable text. Field rules are unchanged.
+- Changed: `apiRequest` accepts empty (204) responses.
+
 ## TF02 — API client and TanStack Query (2026-11-11)
 
 - Added: dependency `@tanstack/react-query` (v5); `src/main.tsx` wraps the app in

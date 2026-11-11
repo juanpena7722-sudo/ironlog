@@ -3,8 +3,7 @@ import cookie from '@fastify/cookie'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import argon2 from 'argon2'
-import { z } from 'zod'
-import { textSchema } from '../../shared/schemas.js'
+import { DeleteAccountSchema, LoginSchema, RegisterSchema } from '../../shared/schemas.js'
 import { Prisma } from './generated/prisma/client.js'
 import type { Env } from './env.js'
 
@@ -46,12 +45,6 @@ export const DEFAULT_GOALS = {
 } as const
 const PUBLIC_USER = { id: true, email: true } as const
 
-const EMAIL_SCHEMA = textSchema.trim().toLowerCase().pipe(z.email().max(254))
-const PASSWORD_SCHEMA = textSchema.min(1).max(128)
-const REGISTER_SCHEMA = z.object({ email: EMAIL_SCHEMA, password: textSchema.min(10).max(128) })
-const LOGIN_SCHEMA = z.object({ email: EMAIL_SCHEMA, password: PASSWORD_SCHEMA })
-const DELETE_ACCOUNT_SCHEMA = z.object({ password: PASSWORD_SCHEMA })
-
 // Verified when the email is unknown so login takes the same time either way.
 const DUMMY_HASH = argon2.hash('not-a-real-password', { type: argon2.argon2id })
 
@@ -73,7 +66,7 @@ async function authRoutes(app: FastifyInstance) {
   }
 
   app.post('/register', RATE_LIMIT, async (request, reply) => {
-    const { email, password } = REGISTER_SCHEMA.parse(request.body)
+    const { email, password } = RegisterSchema.parse(request.body)
     const passwordHash = await argon2.hash(password, { type: argon2.argon2id })
     try {
       const user = await app.db.user.create({
@@ -91,7 +84,7 @@ async function authRoutes(app: FastifyInstance) {
   })
 
   app.post('/login', RATE_LIMIT, async (request, reply) => {
-    const { email, password } = LOGIN_SCHEMA.parse(request.body)
+    const { email, password } = LoginSchema.parse(request.body)
     const user = await app.db.user.findUnique({ where: { email } })
     const isValid = await verifyPassword(user?.passwordHash ?? (await DUMMY_HASH), password)
     if (!user || !isValid) throw app.httpErrors.unauthorized(INVALID_CREDENTIALS)
@@ -113,7 +106,7 @@ async function authRoutes(app: FastifyInstance) {
   })
 
   app.delete('/account', { ...RATE_LIMIT, preHandler: app.requireAuth }, async (request, reply) => {
-    const { password } = DELETE_ACCOUNT_SCHEMA.parse(request.body)
+    const { password } = DeleteAccountSchema.parse(request.body)
     const user = await app.db.user.findUnique({ where: { id: request.userId } })
     if (!user) throw app.httpErrors.unauthorized('Not authenticated')
     if (!(await verifyPassword(user.passwordHash, password))) {

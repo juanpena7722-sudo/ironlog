@@ -2,18 +2,22 @@ import { describe, expect, it } from 'vitest'
 import {
   AppDataSchema,
   BodyEntrySchema,
+  DeleteAccountSchema,
   ExerciseEntrySchema,
   FoodEntrySchema,
   GoalsSchema,
   HealthEntrySchema,
   ISODateSchema,
+  LoginSchema,
   MEALS,
   MUSCLES,
   MealSchema,
   NAME_MAX,
   NOTES_MAX,
+  RegisterSchema,
   SetEntrySchema,
   UnitSchema,
+  UserSchema,
   WorkoutSchema,
   isRealISODate,
 } from './schemas'
@@ -338,6 +342,54 @@ describe('AppDataSchema', () => {
     ['a non-object value', 'not json'],
   ])('rejects a backup with %s', (_label, value) => {
     expect(AppDataSchema.safeParse(value).success).toBe(false)
+  })
+})
+
+describe('auth schemas', () => {
+  const credentials = { email: ' Lifter@Example.COM ', password: 'long enough' }
+
+  it('normalises the email on login and register', () => {
+    const expected = { email: 'lifter@example.com', password: 'long enough' }
+    expect(LoginSchema.parse(credentials)).toEqual(expected)
+    expect(RegisterSchema.parse(credentials)).toEqual(expected)
+  })
+
+  it.each([
+    [
+      'an invalid email',
+      LoginSchema,
+      { ...credentials, email: 'nope' },
+      'Enter a valid email address',
+    ],
+    [
+      'a too long email',
+      LoginSchema,
+      { ...credentials, email: `${'a'.repeat(250)}@x.io` },
+      'Email is too long',
+    ],
+    ['an empty password', LoginSchema, { ...credentials, password: '' }, 'Enter your password'],
+    [
+      'a too long password',
+      LoginSchema,
+      { ...credentials, password: 'a'.repeat(129) },
+      'Password must be at most 128 characters',
+    ],
+    [
+      'a short register password',
+      RegisterSchema,
+      { ...credentials, password: 'short' },
+      'Password must be at least 10 characters',
+    ],
+    ['an empty delete password', DeleteAccountSchema, { password: '' }, 'Enter your password'],
+  ])('rejects %s with a readable message', (_label, schema, value, message) => {
+    const result = schema.safeParse(value)
+    expect(result.error?.issues[0].message).toBe(message)
+  })
+
+  it('parses the public user', () => {
+    const user = { id: '3f0c1a52-8d4e-4b7a-9c1e-2a6b5d7e8f90', email: 'lifter@example.com' }
+    expect(UserSchema.parse(user)).toEqual(user)
+    expect(UserSchema.safeParse({ ...user, id: 'nope' }).success).toBe(false)
   })
 })
 

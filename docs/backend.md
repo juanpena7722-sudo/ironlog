@@ -14,8 +14,9 @@ relative import, for example `import { WorkoutSchema } from '../../shared/schema
 no path alias in `server/`.
 
 Postgres rejects the NUL character in text columns, so `shared/schemas.ts` exports `textSchema`,
-a string that rejects NUL. Ids, names and notes in the shared schemas, and the email and
-password schemas in `server/src/auth.ts`, build on it, so NUL returns 400 instead of 500.
+a string that rejects NUL. Ids, names, notes, emails and passwords in the shared schemas build
+on it, so NUL returns 400 instead of 500. `server/src/auth.ts` validates its request bodies with
+the shared `RegisterSchema`, `LoginSchema` and `DeleteAccountSchema`.
 
 `shared/` has no `node_modules` of its own, and CI's backend job installs only the server
 dependencies (`npm ci` in `server/`). So that `tsc` can resolve `zod` for `shared/schemas.ts` in
@@ -416,4 +417,4 @@ response outside `development`.
 Route handlers throw `app.httpErrors.<name>(detail)` for expected failures (for example
 `app.httpErrors.conflict('Email already registered')`) and let the global handler format them.
 
-_Last updated by TB09._
+_Last updated by TF03._

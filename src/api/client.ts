@@ -36,7 +36,8 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'same-origin' })
   if (!response.ok) throw await toApiError(response)
-  return schema.parse(await response.json())
+  const text = await response.text()
+  return schema.parse(text ? JSON.parse(text) : undefined)
 }
 
 export function shouldRetry(failureCount: number, error: Error): boolean {

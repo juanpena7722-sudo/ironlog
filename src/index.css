@@ -505,6 +505,38 @@ tr:last-child td {
   font-size: 0.75rem;
 }
 
+/* ---------- auth ---------- */
+.auth {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 48px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.auth form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+button.nav-link {
+  margin-top: auto;
+  background: transparent;
+  border: none;
+  text-align: left;
+}
+
 /* ---------- mobile ---------- */
 @media (max-width: 760px) {
   .shell {
@@ -527,6 +559,9 @@ tr:last-child td {
   }
   .brand {
     display: none;
+  }
+  button.nav-link {
+    margin-top: 0;
   }
   .nav-link {
     flex-direction: column;

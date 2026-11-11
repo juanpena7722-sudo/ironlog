@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useId } from 'react'
+import type { InputHTMLAttributes, ReactNode } from 'react'
 
 export function Card({
   title,
@@ -72,6 +73,31 @@ export function PageHead({ title, sub }: { title: string; sub?: string }) {
     <div className="page-head">
       <h1>{title}</h1>
       {sub && <p className="muted">{sub}</p>}
+    </div>
+  )
+}
+
+export function Field({
+  label,
+  error,
+  ...input
+}: { label: string; error?: string } & InputHTMLAttributes<HTMLInputElement>) {
+  const errorId = useId()
+  return (
+    <div className="field">
+      <label>
+        {label}
+        <input
+          {...input}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+        />
+      </label>
+      {error && (
+        <p id={errorId} className="field-error">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
