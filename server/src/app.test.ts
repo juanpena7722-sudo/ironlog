@@ -90,3 +90,68 @@ describe('buildApp', () => {
     expect(response.body).not.toContain('at ')
   })
 })
+
+describe('hardening', () => {
+  it('sets security headers including CSP and the global rate limit', async () => {
+    const response = await buildTestApp().inject({ method: 'GET', url: '/api/v1/health' })
+    expect(response.headers['content-security-policy']).toContain("default-src 'self'")
+    expect(response.headers['x-content-type-options']).toBe('nosniff')
+    expect(response.headers['x-frame-options']).toBe('SAMEORIGIN')
+    expect(response.headers['strict-transport-security']).toContain('max-age=')
+    expect(response.headers['x-ratelimit-limit']).toBe('300')
+  })
+
+  it('redacts secrets from logs', async () => {
+    const lines: string[] = []
+    const app = buildApp(TEST_ENV, { write: (line) => lines.push(line) })
+    app.post('/test/log', async (request) => {
+      request.log.info({
+        request: { headers: request.headers },
+        response: { headers: { 'set-cookie': 'session=reply-token' } },
+        password: 'top-level-secret',
+        body: request.body,
+      })
+      return { isLogged: true }
+    })
+    const response = await app.inject({
+      method: 'POST',
+      url: '/test/log',
+      headers: { authorization: 'Bearer header-token', cookie: 'session=request-token' },
+      payload: { email: 'a@b.co', password: 'body-secret' },
+    })
+    expect(response.statusCode).toBe(200)
+    const output = lines.join('')
+    expect(output).toContain('[Redacted]')
+    for (const secret of [
+      'header-token',
+      'request-token',
+      'reply-token',
+      'top-level-secret',
+      'body-secret',
+    ]) {
+      expect(output).not.toContain(secret)
+    }
+  })
+
+  it('serves the OpenAPI document at /docs outside production', async () => {
+    const response = await buildTestApp('development').inject({ method: 'GET', url: '/docs' })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({ openapi: expect.any(String) })
+  })
+
+  it('returns 404 for /docs in production', async () => {
+    const response = await buildTestApp('production').inject({ method: 'GET', url: '/docs' })
+    expect(response.statusCode).toBe(404)
+    expect(response.headers['content-type']).toMatch(/^application\/problem\+json/)
+  })
+
+  it('rejects bodies over the limit with 413 Problem Details', async () => {
+    const response = await buildTestApp().inject({
+      method: 'POST',
+      url: '/test/validate',
+      payload: { name: 'x'.repeat(200 * 1024) },
+    })
+    expect(response.statusCode).toBe(413)
+    expect(response.json()).toMatchObject({ title: 'Payload Too Large', status: 413 })
+  })
+})

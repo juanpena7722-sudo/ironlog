@@ -1,6 +1,8 @@
 import { STATUS_CODES } from 'node:http'
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply } from 'fastify'
+import helmet from '@fastify/helmet'
 import sensible from '@fastify/sensible'
+import swagger from '@fastify/swagger'
 import { ZodError } from 'zod'
 import { registerAuth } from './auth.js'
 import { backupRoutes } from './backup.js'
@@ -22,20 +24,31 @@ function sendProblem(reply: FastifyReply, status: number, detail: string, errors
 }
 
 const LOG_REDACT_PATHS = [
-  'req.headers.authorization',
-  'req.headers.cookie',
-  'res.headers["set-cookie"]',
+  '*.headers.authorization',
+  '*.headers.cookie',
+  '*.headers["set-cookie"]',
   'password',
   '*.password',
 ]
+const BODY_LIMIT = 100 * 1024
 
 export function buildApp(env: Env, logStream?: { write(message: string): void }): FastifyInstance {
   const isSilent = env.NODE_ENV === 'test' && !logStream
+  const isProduction = env.NODE_ENV === 'production'
   const app = Fastify({
     logger: { level: isSilent ? 'silent' : 'info', stream: logStream, redact: LOG_REDACT_PATHS },
+    bodyLimit: BODY_LIMIT,
+    // In production the API is only reachable through the gateway, which sets X-Forwarded-For.
+    trustProxy: isProduction,
   })
 
   app.register(sensible)
+  app.register(helmet)
+
+  if (!isProduction) {
+    app.register(swagger, { openapi: { info: { title: 'IronLog API', version: '1' } } })
+    app.get('/docs', { schema: { hide: true } }, async () => app.swagger())
+  }
 
   app.decorate('db', createDb(env.DATABASE_URL))
   app.addHook('onClose', () => app.db.$disconnect())
@@ -62,7 +75,9 @@ export function buildApp(env: Env, logStream?: { write(message: string): void })
 
   registerAuth(app, env)
 
-  app.get('/api/v1/health', async () => ({ status: 'ok' }))
+  app.register(async (api) => {
+    api.get('/api/v1/health', async () => ({ status: 'ok' }))
+  })
   app.register(workoutRoutes, { prefix: '/api/v1/workouts' })
   app.register(foodRoutes, { prefix: '/api/v1/foods' })
   app.register(bodyRoutes, { prefix: '/api/v1/body' })
