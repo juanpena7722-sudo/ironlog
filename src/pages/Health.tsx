@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Bar,
@@ -11,7 +11,7 @@ import {
   YAxis,
   Legend,
 } from 'recharts'
-import { useStore } from '../store'
+import { DEFAULT_GOALS, useDeleteHealth, useGoals, useHealth, useSaveHealth } from '../store'
 import type { HealthEntry } from '../types'
 import { Card, Empty, PageHead, Stat, chart } from '../components/ui'
 import { byDateDesc, fmtDate, lastNDays, num, round, today, uid } from '../utils'
@@ -38,38 +38,38 @@ const toForm = (date: string, h?: HealthEntry): Form => ({
 
 const ENERGY = ['', '😫 Drained', '😕 Low', '😐 OK', '🙂 Good', '🔥 Great']
 
+const NO_ENTRIES: HealthEntry[] = []
+
 const avg = (xs: (number | undefined)[]) => {
   const v = xs.filter((x): x is number => x !== undefined)
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : undefined
 }
 
 export default function Health() {
-  const { data, upsert, remove } = useStore()
-  const g = data.goals
+  const entries = useHealth().data ?? NO_ENTRIES
+  const g = useGoals().data ?? DEFAULT_GOALS
+  const saveHealth = useSaveHealth()
+  const deleteHealth = useDeleteHealth()
   const [date, setDate] = useState(today())
-  const existing = data.health.find((h) => h.date === date)
-  const [form, setForm] = useState<Form>(() => toForm(date, existing))
+  const existing = entries.find((h) => h.date === date)
+  // Unedited, the form shows the stored entry for the date, including once it has loaded.
+  const [edited, setForm] = useState<Form | null>(null)
+  const form = edited ?? toForm(date, existing)
 
-  // Reset the form only when the date changes, not on every data update.
-  useEffect(() => {
-    setForm(
-      toForm(
-        date,
-        data.health.find((h) => h.date === date),
-      ),
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date])
+  const selectDate = (d: string) => {
+    setDate(d)
+    setForm(null)
+  }
 
-  const week = lastNDays(7).map((d) => data.health.find((h) => h.date === d))
+  const week = lastNDays(7).map((d) => entries.find((h) => h.date === d))
 
   const series = useMemo(
     () =>
       lastNDays(14).map((d) => {
-        const h = data.health.find((x) => x.date === d)
+        const h = entries.find((x) => x.date === d)
         return { label: fmtDate(d), sleep: h?.sleepHours, water: h?.waterL, hr: h?.restingHR }
       }),
-    [data.health],
+    [entries],
   )
 
   const submit = (e: FormEvent) => {
@@ -84,7 +84,7 @@ export default function Health() {
       energy: num(form.energy),
       notes: form.notes.trim() || undefined,
     }
-    upsert('health', entry)
+    saveHealth.mutate(entry)
   }
 
   const fmt = (v: number | undefined, u: string, dp = 1) =>
@@ -121,7 +121,7 @@ export default function Health() {
                 <input
                   type="date"
                   value={date}
-                  onChange={(e) => setDate(e.target.value || today())}
+                  onChange={(e) => selectDate(e.target.value || today())}
                 />
               </label>
               <label>
@@ -220,7 +220,7 @@ export default function Health() {
       </div>
 
       <Card title="History">
-        {data.health.length === 0 ? (
+        {entries.length === 0 ? (
           <Empty>No health logs yet.</Empty>
         ) : (
           <div className="table-wrap">
@@ -238,10 +238,10 @@ export default function Health() {
                 </tr>
               </thead>
               <tbody>
-                {[...data.health].sort(byDateDesc).map((h) => (
+                {[...entries].sort(byDateDesc).map((h) => (
                   <tr key={h.id}>
                     <td>
-                      <button className="link" onClick={() => setDate(h.date)}>
+                      <button className="link" onClick={() => selectDate(h.date)}>
                         {fmtDate(h.date)}
                       </button>
                     </td>
@@ -252,7 +252,10 @@ export default function Health() {
                     <td>{h.energy ? ENERGY[h.energy] : '—'}</td>
                     <td className="muted notes">{h.notes ?? ''}</td>
                     <td>
-                      <button className="ghost danger small" onClick={() => remove('health', h.id)}>
+                      <button
+                        className="ghost danger small"
+                        onClick={() => deleteHealth.mutate(h.date)}
+                      >
                         ✕
                       </button>
                     </td>

@@ -40,6 +40,10 @@ export async function apiRequest<T>(
   return schema.parse(text ? JSON.parse(text) : undefined)
 }
 
+export function jsonRequest(method: string, body: unknown): RequestInit {
+  return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+}
+
 export function shouldRetry(failureCount: number, error: Error): boolean {
   return failureCount < 1 && error instanceof ApiError && error.status >= 500
 }

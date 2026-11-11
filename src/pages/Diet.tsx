@@ -10,11 +10,18 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { useStore } from '../store'
+import {
+  DEFAULT_GOALS,
+  useAddFood,
+  useDeleteFood,
+  useFoods,
+  useGoals,
+  useRecentFoods,
+} from '../store'
 import { MEALS } from '../types'
 import type { FoodEntry, Meal } from '../types'
 import { Card, Empty, Meter, PageHead, chart } from '../components/ui'
-import { fmtDate, fmtLongDate, lastNDays, num, today, totals, uid } from '../utils'
+import { daysAgo, fmtDate, fmtLongDate, lastNDays, num, today, totals, uid } from '../utils'
 
 type FoodForm = {
   name: string
@@ -24,6 +31,10 @@ type FoodForm = {
   carbs: string
   fat: string
 }
+
+const HISTORY_DAYS = 14
+const NO_FOODS: FoodEntry[] = []
+
 const emptyForm: FoodForm = {
   name: '',
   meal: 'Breakfast',
@@ -34,30 +45,24 @@ const emptyForm: FoodForm = {
 }
 
 export default function Diet() {
-  const { data, upsert, remove } = useStore()
-  const g = data.goals
+  const g = useGoals().data ?? DEFAULT_GOALS
   const [date, setDate] = useState(today())
   const [form, setForm] = useState<FoodForm>(emptyForm)
+  const dayEntries = useFoods({ from: date, to: date }).data ?? NO_FOODS
+  const historyFoods = useFoods({ from: daysAgo(HISTORY_DAYS - 1) }).data ?? NO_FOODS
+  const recent = useRecentFoods().data ?? NO_FOODS
+  const addFood = useAddFood()
+  const deleteFood = useDeleteFood()
 
-  const dayEntries = useMemo(() => data.foods.filter((f) => f.date === date), [data.foods, date])
   const t = totals(dayEntries)
-
-  const recent = useMemo(() => {
-    const seen = new Map<string, FoodEntry>()
-    ;[...data.foods].reverse().forEach((f) => {
-      const k = f.name.toLowerCase()
-      if (!seen.has(k)) seen.set(k, f)
-    })
-    return [...seen.values()].slice(0, 12)
-  }, [data.foods])
 
   const history = useMemo(
     () =>
-      lastNDays(14).map((d) => {
-        const tt = totals(data.foods.filter((f) => f.date === d))
+      lastNDays(HISTORY_DAYS).map((d) => {
+        const tt = totals(historyFoods.filter((f) => f.date === d))
         return { label: fmtDate(d), ...tt }
       }),
-    [data.foods],
+    [historyFoods],
   )
 
   const macroKcal =
@@ -66,20 +71,22 @@ export default function Diet() {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) return
-    upsert('foods', {
-      id: uid(),
-      date,
-      meal: form.meal,
-      name: form.name.trim(),
-      calories: num(form.calories) ?? Math.round(macroKcal),
-      protein: num(form.protein) ?? 0,
-      carbs: num(form.carbs) ?? 0,
-      fat: num(form.fat) ?? 0,
-    })
-    setForm({ ...emptyForm, meal: form.meal })
+    addFood.mutate(
+      {
+        id: uid(),
+        date,
+        meal: form.meal,
+        name: form.name.trim(),
+        calories: num(form.calories) ?? Math.round(macroKcal),
+        protein: num(form.protein) ?? 0,
+        carbs: num(form.carbs) ?? 0,
+        fat: num(form.fat) ?? 0,
+      },
+      { onSuccess: () => setForm({ ...emptyForm, meal: form.meal }) },
+    )
   }
 
-  const quickAdd = (f: FoodEntry) => upsert('foods', { ...f, id: uid(), date, meal: form.meal })
+  const quickAdd = (f: FoodEntry) => addFood.mutate({ ...f, date, meal: form.meal })
 
   return (
     <>
@@ -222,7 +229,7 @@ export default function Diet() {
                       {f.calories} kcal · {f.protein}P / {f.carbs}C / {f.fat}F
                       <button
                         className="ghost danger small"
-                        onClick={() => remove('foods', f.id)}
+                        onClick={() => deleteFood.mutate(f.id)}
                         title="Remove"
                       >
                         ✕

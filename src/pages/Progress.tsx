@@ -10,10 +10,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { useStore } from '../store'
+import { DEFAULT_GOALS, useBody, useDeleteBody, useGoals, useSaveBody } from '../store'
 import type { BodyEntry } from '../types'
 import { Card, Empty, PageHead, Stat, chart } from '../components/ui'
-import { byDateAsc, byDateDesc, daysAgo, fmtDate, num, round, today, uid } from '../utils'
+import { byDateAsc, byDateDesc, daysAgo, fmtDate, num, today, uid } from '../utils'
+import { fromDisplayLength, fromDisplayWeight, toDisplayLength, toDisplayWeight } from '../units'
 
 const FIELDS = [
   ['bodyFat', 'Body fat %'],
@@ -23,7 +24,10 @@ const FIELDS = [
   ['thighs', 'Thighs'],
 ] as const
 
-type Form = Record<'date' | 'weight' | (typeof FIELDS)[number][0], string>
+const NO_ENTRIES: BodyEntry[] = []
+
+type Metric = 'weight' | (typeof FIELDS)[number][0]
+type Form = Record<'date' | Metric, string>
 const emptyForm = (): Form => ({
   date: today(),
   weight: '',
@@ -35,13 +39,18 @@ const emptyForm = (): Form => ({
 })
 
 export default function Progress() {
-  const { data, upsert, remove } = useStore()
-  const { unit, targetWeight } = data.goals
+  const entries = useBody().data ?? NO_ENTRIES
+  const { unit, targetWeight } = useGoals().data ?? DEFAULT_GOALS
+  const saveBody = useSaveBody()
+  const deleteBody = useDeleteBody()
   const lenUnit = unit === 'kg' ? 'cm' : 'in'
   const [form, setForm] = useState<Form>(emptyForm)
-  const [metric, setMetric] = useState<'weight' | (typeof FIELDS)[number][0]>('weight')
+  const [metric, setMetric] = useState<Metric>('weight')
+  const weight = (kg: number) => toDisplayWeight(kg, unit)
+  const show = (k: Metric, value: number) =>
+    k === 'weight' ? weight(value) : k === 'bodyFat' ? value : toDisplayLength(value, unit)
 
-  const asc = useMemo(() => [...data.body].sort(byDateAsc), [data.body])
+  const asc = useMemo(() => [...entries].sort(byDateAsc), [entries])
   const latest = asc.at(-1)
 
   const weekAvg = (from: number, to: number) => {
@@ -56,26 +65,29 @@ export default function Progress() {
 
   const series = asc
     .filter((b) => b[metric] !== undefined)
-    .map((b) => ({ label: fmtDate(b.date), value: b[metric] as number }))
+    .map((b) => ({ label: fmtDate(b.date), value: show(metric, b[metric] as number) }))
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    const weight = num(form.weight)
-    if (weight === undefined) return
+    const value = num(form.weight)
+    if (value === undefined) return
     // One entry per day: replace any existing entry with the same date.
-    const existing = data.body.find((b) => b.date === form.date)
-    const entry: BodyEntry = { id: existing?.id ?? uid(), date: form.date, weight }
+    const existing = entries.find((b) => b.date === form.date)
+    const entry: BodyEntry = {
+      id: existing?.id ?? uid(),
+      date: form.date,
+      weight: fromDisplayWeight(value, unit),
+    }
     FIELDS.forEach(([k]) => {
       const v = num(form[k])
-      if (v !== undefined) entry[k] = v
+      if (v !== undefined) entry[k] = k === 'bodyFat' ? v : fromDisplayLength(v, unit)
     })
-    upsert('body', entry)
-    setForm(emptyForm())
+    saveBody.mutate({ id: existing?.id, entry }, { onSuccess: () => setForm(emptyForm()) })
   }
 
   const delta = (a?: number, b?: number) => {
     if (a === undefined || b === undefined) return '—'
-    const d = round(a - b)
+    const d = weight(a - b)
     return `${d > 0 ? '+' : ''}${d} ${unit}`
   }
 
@@ -86,19 +98,19 @@ export default function Progress() {
       <div className="stats">
         <Stat
           label="Current weight"
-          value={latest ? `${latest.weight} ${unit}` : '—'}
+          value={latest ? `${weight(latest.weight)} ${unit}` : '—'}
           sub={latest && fmtDate(latest.date)}
         />
         <Stat
           label="7-day average"
-          value={thisWeek ? `${round(thisWeek)} ${unit}` : '—'}
+          value={thisWeek ? `${weight(thisWeek)} ${unit}` : '—'}
           sub={`vs last week: ${delta(thisWeek, lastWeek)}`}
         />
         <Stat label="30-day change" value={delta(latest?.weight, monthAgo?.weight)} />
         <Stat
           label="To target"
           value={latest ? delta(targetWeight, latest.weight) : '—'}
-          sub={`Target ${targetWeight} ${unit}`}
+          sub={`Target ${weight(targetWeight)} ${unit}`}
         />
       </div>
 
@@ -106,7 +118,7 @@ export default function Progress() {
         <Card
           title="Trend"
           action={
-            <select value={metric} onChange={(e) => setMetric(e.target.value as typeof metric)}>
+            <select value={metric} onChange={(e) => setMetric(e.target.value as Metric)}>
               <option value="weight">Weight</option>
               {FIELDS.map(([k, l]) => (
                 <option key={k} value={k}>
@@ -134,7 +146,7 @@ export default function Progress() {
                   <Tooltip {...chart.tooltip} />
                   {metric === 'weight' && (
                     <ReferenceLine
-                      y={targetWeight}
+                      y={weight(targetWeight)}
                       stroke={chart.tertiary}
                       strokeDasharray="4 4"
                       label={{
@@ -219,19 +231,22 @@ export default function Progress() {
                 </tr>
               </thead>
               <tbody>
-                {[...data.body].sort(byDateDesc).map((b) => (
+                {[...entries].sort(byDateDesc).map((b) => (
                   <tr key={b.id}>
                     <td>{fmtDate(b.date)}</td>
                     <td>
-                      <strong>{b.weight}</strong>
+                      <strong>{weight(b.weight)}</strong>
                     </td>
                     {FIELDS.map(([k]) => (
                       <td key={k} className="muted">
-                        {b[k] ?? '—'}
+                        {b[k] === undefined ? '—' : show(k, b[k])}
                       </td>
                     ))}
                     <td>
-                      <button className="ghost danger small" onClick={() => remove('body', b.id)}>
+                      <button
+                        className="ghost danger small"
+                        onClick={() => deleteBody.mutate(b.id)}
+                      >
                         ✕
                       </button>
                     </td>

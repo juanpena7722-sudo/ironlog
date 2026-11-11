@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { useStore } from '../store'
+import { DEFAULT_GOALS, useDeleteWorkout, useGoals, useSaveWorkout, useWorkouts } from '../store'
 import { MUSCLES } from '../types'
 import type { ExerciseEntry, Workout } from '../types'
 import { Card, Empty, PageHead, chart } from '../components/ui'
@@ -18,12 +18,23 @@ import {
   workoutVolume,
   daysAgo,
 } from '../utils'
+import { fromDisplayWeight, toDisplayWeight } from '../units'
+
+const NO_WORKOUTS: Workout[] = []
 
 const newExercise = (): ExerciseEntry => ({
   id: uid(),
   name: '',
   muscle: 'Chest',
   sets: [{ reps: 8, weight: 0 }],
+})
+
+const convertWeights = (w: Workout, convert: (weight: number) => number): Workout => ({
+  ...w,
+  exercises: w.exercises.map((e) => ({
+    ...e,
+    sets: e.sets.map((s) => ({ ...s, weight: convert(s.weight) })),
+  })),
 })
 
 const blankWorkout = (): Workout => ({
@@ -34,34 +45,37 @@ const blankWorkout = (): Workout => ({
 })
 
 export default function Workouts() {
-  const { data, upsert, remove } = useStore()
-  const unit = data.goals.unit
+  const allWorkouts = useWorkouts().data ?? NO_WORKOUTS
+  const { unit } = useGoals().data ?? DEFAULT_GOALS
+  const saveWorkout = useSaveWorkout()
+  const deleteWorkout = useDeleteWorkout()
+  const display = (kg: number) => toDisplayWeight(kg, unit)
   const [draft, setDraft] = useState<Workout | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
 
-  const workouts = useMemo(() => [...data.workouts].sort(byDateDesc), [data.workouts])
+  const workouts = useMemo(() => [...allWorkouts].sort(byDateDesc), [allWorkouts])
 
   const exerciseNames = useMemo(() => {
     const s = new Set<string>()
-    data.workouts.forEach((w) => w.exercises.forEach((e) => e.name && s.add(e.name)))
+    allWorkouts.forEach((w) => w.exercises.forEach((e) => e.name && s.add(e.name)))
     return [...s].sort()
-  }, [data.workouts])
+  }, [allWorkouts])
 
   const lastMuscleFor = useMemo(() => {
     const m = new Map<string, string>()
-    ;[...data.workouts]
+    ;[...allWorkouts]
       .sort(byDateDesc)
       .reverse()
       .forEach((w) => w.exercises.forEach((e) => m.set(e.name.toLowerCase(), e.muscle)))
     return m
-  }, [data.workouts])
+  }, [allWorkouts])
 
   const prs = useMemo(() => {
     const best = new Map<
       string,
       { name: string; weight: number; reps: number; e1rm: number; date: string }
     >()
-    data.workouts.forEach((w) =>
+    allWorkouts.forEach((w) =>
       w.exercises.forEach((ex) =>
         ex.sets.forEach((s) => {
           const est = e1rm(s.weight, s.reps)
@@ -80,34 +94,44 @@ export default function Workouts() {
       ),
     )
     return [...best.values()].sort((a, b) => b.e1rm - a.e1rm)
-  }, [data.workouts])
+  }, [allWorkouts])
 
   const weekly = useMemo(() => {
     const weeks: { week: string; volume: number; sessions: number }[] = []
     for (let i = 7; i >= 0; i--) {
       weeks.push({ week: weekStart(daysAgo(i * 7)), volume: 0, sessions: 0 })
     }
-    data.workouts.forEach((w) => {
+    allWorkouts.forEach((w) => {
       const wk = weeks.find((x) => x.week === weekStart(w.date))
       if (wk) {
         wk.volume += workoutVolume(w)
         wk.sessions += 1
       }
     })
-    return weeks.map((w) => ({ ...w, label: fmtDate(w.week) }))
-  }, [data.workouts])
+    return weeks.map((w) => ({
+      ...w,
+      volume: toDisplayWeight(w.volume, unit),
+      label: fmtDate(w.week),
+    }))
+  }, [allWorkouts, unit])
 
   const patch = (fn: (w: Workout) => Workout) => setDraft((d) => (d ? fn(d) : d))
   const patchEx = (id: string, fn: (e: ExerciseEntry) => ExerciseEntry) =>
     patch((w) => ({ ...w, exercises: w.exercises.map((e) => (e.id === id ? fn(e) : e)) }))
 
-  const startFrom = (w: Workout) =>
+  const edit = (w: Workout) => setDraft(convertWeights(w, display))
+
+  const startFrom = (w: Workout) => {
+    const copy = convertWeights(w, display)
     setDraft({
-      ...structuredClone(w),
+      ...copy,
       id: uid(),
       date: today(),
-      exercises: w.exercises.map((e) => ({ ...structuredClone(e), id: uid() })),
+      exercises: copy.exercises.map((e) => ({ ...e, id: uid() })),
     })
+  }
+
+  const isEditing = draft !== null && allWorkouts.some((w) => w.id === draft.id)
 
   const save = () => {
     if (!draft) return
@@ -119,8 +143,13 @@ export default function Workouts() {
         .map((e) => ({ ...e, name: e.name.trim(), sets: e.sets.filter((s) => s.reps > 0) })),
     }
     if (cleaned.exercises.length === 0) return
-    upsert('workouts', cleaned)
-    setDraft(null)
+    saveWorkout.mutate(
+      {
+        id: isEditing ? cleaned.id : undefined,
+        entry: convertWeights(cleaned, (weight) => fromDisplayWeight(weight, unit)),
+      },
+      { onSuccess: () => setDraft(null) },
+    )
   }
 
   return (
@@ -128,7 +157,7 @@ export default function Workouts() {
       <PageHead title="Workouts" sub="Log sessions, track your lifts and personal records." />
 
       {draft ? (
-        <Card title={data.workouts.some((w) => w.id === draft.id) ? 'Edit workout' : 'New workout'}>
+        <Card title={isEditing ? 'Edit workout' : 'New workout'}>
           <div className="form-grid">
             <label>
               Name
@@ -345,10 +374,10 @@ export default function Workouts() {
                     <tr key={p.name}>
                       <td>{p.name}</td>
                       <td>
-                        {p.weight} × {p.reps}
+                        {display(p.weight)} × {p.reps}
                       </td>
                       <td>
-                        <strong>{round(p.e1rm)}</strong> {unit}
+                        <strong>{display(p.e1rm)}</strong> {unit}
                       </td>
                       <td className="muted">{fmtDate(p.date)}</td>
                     </tr>
@@ -379,8 +408,8 @@ export default function Workouts() {
                     </div>
                   </div>
                   <div className="muted small right">
-                    {w.exercises.length} exercises · {Math.round(workoutVolume(w)).toLocaleString()}{' '}
-                    {unit}
+                    {w.exercises.length} exercises ·{' '}
+                    {Math.round(display(workoutVolume(w))).toLocaleString()} {unit}
                   </div>
                 </button>
                 {openId === w.id && (
@@ -391,8 +420,8 @@ export default function Workouts() {
                           {e.name} <span className="tag">{e.muscle}</span>
                         </span>
                         <span className="muted">
-                          {e.sets.map((s) => `${s.weight}×${s.reps}`).join(', ')} ·{' '}
-                          {Math.round(exerciseVolume(e))} {unit}
+                          {e.sets.map((s) => `${display(s.weight)}×${s.reps}`).join(', ')} ·{' '}
+                          {Math.round(display(exerciseVolume(e)))} {unit}
                         </span>
                       </div>
                     ))}
@@ -401,7 +430,7 @@ export default function Workouts() {
                       <button
                         className="ghost small"
                         onClick={() => {
-                          setDraft(structuredClone(w))
+                          edit(w)
                           window.scrollTo({ top: 0 })
                         }}
                       >
@@ -418,7 +447,7 @@ export default function Workouts() {
                       </button>
                       <button
                         className="ghost small danger"
-                        onClick={() => remove('workouts', w.id)}
+                        onClick={() => deleteWorkout.mutate(w.id)}
                       >
                         Delete
                       </button>

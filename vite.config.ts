@@ -21,13 +21,14 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['shared/**/*.ts', 'src/utils.ts', 'src/api/**/*.ts'],
+      include: ['shared/**/*.ts', 'src/utils.ts', 'src/units.ts', 'src/api/**/*.ts'],
       exclude: ['**/*.test.ts'],
       thresholds: {
         lines: 80,
         branches: 75,
         'shared/**': { lines: 90, branches: 85 },
         'src/utils.ts': { lines: 90, branches: 85 },
+        'src/units.ts': { lines: 90, branches: 85 },
         'src/api/**': { lines: 90, branches: 85 },
       },
     },
