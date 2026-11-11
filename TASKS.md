@@ -128,7 +128,7 @@ Releases (versioning, tags, deployment) are decided and triggered by the owner o
 2. `src/units.ts` ≥ 90 % coverage; round trip stable to 0.1.
 3. Entering 100 lb saves 45.36 kg; switching to kg shows 45.4.
 
-### [?] TF05 — Backup and local-data migration
+### [x] TF05 — Backup and local-data migration
 
 **Branch:** `feat/tf05-backup-migration`
 
