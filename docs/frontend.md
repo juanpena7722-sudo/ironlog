@@ -2,18 +2,18 @@
 
 ## Structure
 
-| Path                | Contents                                                                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/main.tsx`      | Entry point. Renders `App` inside `QueryClientProvider` and `HashRouter`.                                                            |
-| `src/App.tsx`       | Routes, the `ProtectedShell` session guard and the navigation. Every page is lazy-loaded with `React.lazy`.                          |
-| `src/pages/`        | One component per route: `Dashboard`, `Workouts`, `Diet`, `Progress`, `Health`, `Settings`, and `Auth` for `/login` and `/register`. |
-| `src/components/`   | Shared UI in `ui.tsx`: `Card`, `Stat`, `Meter`, `Empty`, `PageHead`, `Field` and the `chart` constants.                              |
-| `src/store.tsx`     | Query hooks and mutations for the app data (see [Data layer](#data-layer)), `DEFAULT_GOALS` and `normalize()`.                       |
-| `src/units.ts`      | kg/cm to display unit conversion (see [Units](#units)).                                                                              |
-| `src/api/client.ts` | API client (see below).                                                                                                              |
-| `src/api/auth.ts`   | Session and account hooks (see [Authentication](#authentication)).                                                                   |
-| `src/types.ts`      | Re-exports the data types and constants from `shared/schemas.ts`.                                                                    |
-| `src/test/`         | Test setup and MSW handlers (see [`testing.md`](./testing.md)).                                                                      |
+| Path                | Contents                                                                                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main.tsx`      | Entry point. Renders `App` inside `QueryClientProvider` and `HashRouter`.                                                                                                    |
+| `src/App.tsx`       | Routes, the `ProtectedShell` session guard and the navigation. Every page is lazy-loaded with `React.lazy`.                                                                  |
+| `src/pages/`        | One component per route: `Dashboard`, `Workouts`, `Diet`, `Progress`, `Health`, `Settings`, and `Auth` for `/login` and `/register`.                                         |
+| `src/components/`   | Shared UI in `ui.tsx`: `Card`, `Stat`, `Meter`, `Empty`, `PageHead`, `Field` and the `chart` constants. `LocalDataBanner.tsx` (see [Local data import](#local-data-import)). |
+| `src/store.tsx`     | Query hooks and mutations for the app data (see [Data layer](#data-layer)), `DEFAULT_GOALS`, `normalize()` and `unitHintFor()`.                                              |
+| `src/units.ts`      | kg/cm to display unit conversion (see [Units](#units)).                                                                                                                      |
+| `src/api/client.ts` | API client (see below).                                                                                                                                                      |
+| `src/api/auth.ts`   | Session and account hooks (see [Authentication](#authentication)).                                                                                                           |
+| `src/types.ts`      | Re-exports the data types and constants from `shared/schemas.ts`.                                                                                                            |
+| `src/test/`         | Test setup and MSW handlers (see [`testing.md`](./testing.md)).                                                                                                              |
 
 ## Routes
 
@@ -71,8 +71,8 @@ set to `null` and the app navigates to `/login`.
   **Retry** button;
 - with no session it redirects to `/login` and passes the original path and query string as
   `state.from`;
-- with a session it renders the navigation, which ends with a **Log out** button, and the page.
-  A failed logout shows its error above the page.
+- with a session it renders the navigation, which ends with a **Log out** button,
+  `LocalDataBanner` and the page. A failed logout shows its error above the page.
 
 `src/pages/Auth.tsx` renders the login and register forms. It validates with `LoginSchema` or
 `RegisterSchema` from `shared/schemas.ts` before sending. Invalid fields show the schema's
@@ -102,9 +102,9 @@ a wrong password with 401 while the session is still valid.
 
 ## Data layer
 
-`src/store.tsx` reads and writes every collection through the API with TanStack Query. Nothing
-is kept in `localStorage`. The old `ironlog:data` key from the browser-only version is left as it
-is.
+`src/store.tsx` reads and writes every collection through the API with TanStack Query. App data
+is not kept in `localStorage`. Data left in the old `ironlog:data` key by the browser-only
+version can be imported once (see [Local data import](#local-data-import)).
 
 **Queries**
 
@@ -132,28 +132,64 @@ history. Responses are validated with the schemas from `shared/schemas.ts`.
 
 **Mutations.** Each one invalidates its collection's queries on success.
 
-| Hook                 | Request                                                                            | Invalidates |
-| -------------------- | ---------------------------------------------------------------------------------- | ----------- |
-| `useSaveWorkout()`   | `{ id?, entry }`: `PUT /workouts/:id` when `id` is set, otherwise `POST /workouts` | `workouts`  |
-| `useDeleteWorkout()` | `DELETE /workouts/:id`                                                             | `workouts`  |
-| `useAddFood()`       | `POST /foods`                                                                      | `foods`     |
-| `useDeleteFood()`    | `DELETE /foods/:id`                                                                | `foods`     |
-| `useSaveBody()`      | `{ id?, entry }`: `PUT /body/:id` or `POST /body`                                  | `body`      |
-| `useDeleteBody()`    | `DELETE /body/:id`                                                                 | `body`      |
-| `useSaveHealth()`    | `PUT /health-entries/:date` (create or update the day)                             | `health`    |
-| `useDeleteHealth()`  | `DELETE /health-entries/:date`                                                     | `health`    |
-| `useSaveGoals()`     | `PUT /goals`                                                                       | `goals`     |
-| `useReplaceData()`   | `POST /backup/import?mode=replace` with a full `AppData`                           | everything  |
+| Hook                 | Request                                                                                                                               | Invalidates |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `useSaveWorkout()`   | `{ id?, entry }`: `PUT /workouts/:id` when `id` is set, otherwise `POST /workouts`                                                    | `workouts`  |
+| `useDeleteWorkout()` | `DELETE /workouts/:id`                                                                                                                | `workouts`  |
+| `useAddFood()`       | `POST /foods`                                                                                                                         | `foods`     |
+| `useDeleteFood()`    | `DELETE /foods/:id`                                                                                                                   | `foods`     |
+| `useSaveBody()`      | `{ id?, entry }`: `PUT /body/:id` or `POST /body`                                                                                     | `body`      |
+| `useDeleteBody()`    | `DELETE /body/:id`                                                                                                                    | `body`      |
+| `useSaveHealth()`    | `PUT /health-entries/:date` (create or update the day)                                                                                | `health`    |
+| `useDeleteHealth()`  | `DELETE /health-entries/:date`                                                                                                        | `health`    |
+| `useSaveGoals()`     | `PUT /goals`                                                                                                                          | `goals`     |
+| `useImportData()`    | `{ data, mode, unitHint? }`: `POST /backup/import?mode=<mode>&unitHint=<unitHint>` with a full `AppData`; `unitHint` defaults to `kg` | everything  |
 
 Pages keep their look and behaviour. Forms are cleared only after a successful save. The Health
 and Settings forms show the stored values until the user edits a field.
 
-**Settings data card.** **Export backup** downloads `GET /backup`. **Import backup**, **Load
-demo data** and **Clear all logs** send `useReplaceData()`. Import sends the file through
-`normalize()`; demo data sends `makeDemoData()` (with `DEFAULT_GOALS`). **Clear all logs** sends
-empty collections with the saved goals unchanged, so targets and unit are kept; it and its
-confirm button are disabled until `GET /goals` has loaded. **Save targets** is also disabled
-until then.
+**Settings data card.** **Export backup** downloads `GET /backup`. **Import backup** reads the
+file, sends it through `normalize()` and imports it with `useImportData()` in the mode chosen in
+the **Import mode** select: **Merge (add new entries)** (the default) imports at once;
+**Replace all data** first asks for confirmation. A file that is not valid JSON shows `That file
+is not a valid IronLog backup.`; an API error shows the server's `detail`. **Load demo data**
+sends `makeDemoData()` (with `DEFAULT_GOALS`) and **Clear all logs** sends empty collections with
+the saved goals unchanged, so targets and unit are kept; both use `mode=replace` with
+`unitHint=kg`. **Clear all logs** and its confirm button are disabled until `GET /goals` has
+loaded. **Save targets** is also disabled until then.
+
+Replace import, demo data and **Clear all logs** share one confirmation box
+(`role="alertdialog"`, labelled by its question, ending in `This can’t be undone.`). Focus starts
+on **Cancel**; **Cancel** closes it without sending anything.
+
+**Backup units.** `unitHintFor(file)` picks the `unitHint` for an imported file:
+
+| File                                        | `unitHint`                                    |
+| ------------------------------------------- | --------------------------------------------- |
+| `canonicalUnit: 'kg'` (exported by the API) | `kg`: values are already kg and cm            |
+| No `canonicalUnit` (browser-only version)   | The file's `goals.unit` (`kg` if it has none) |
+
+The browser-only version stored weights and lengths in the display unit, and the API export
+always stores kg and cm while its `goals.unit` is the user's display unit. The marker keeps an
+API export from an lb account from being converted a second time.
+
+## Local data import
+
+`LocalDataBanner` (`src/components/LocalDataBanner.tsx`) is rendered by `ProtectedShell` above
+every page. On mount it reads `localStorage['ironlog:data']` and passes it through `normalize()`.
+It shows a card (`aria-label="Import data from this browser"`) only when:
+
+- `localStorage['ironlog:local-import-dismissed']` is not set;
+- `ironlog:data` is valid JSON;
+- it has at least one workout, food, body or health entry (goals alone are not offered, because a
+  merge import never changes goals).
+
+| Button                | Result                                                                                                                                                                                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Import local data** | `useImportData()` with `mode: 'merge'` and `unitHint` = the stored `goals.unit`. On success it removes `ironlog:data`, hides the card and every query is refreshed. On failure the data is kept, the card stays and the error shows in `role="alert"`. Buttons are disabled while it runs. |
+| **Dismiss**           | Sets `ironlog:local-import-dismissed` to `true` and hides the card. `ironlog:data` is kept.                                                                                                                                                                                                |
+
+The dismissal is per browser, not per account.
 
 ## Units
 
@@ -185,4 +221,4 @@ request under `/api` to `http://localhost:3000`, the API started with
 `Origin` header and passes the API's same-origin check on state-changing requests. It stands in for the gateway, which does the same in production
 (see [`architecture.md`](./architecture.md#gateway)).
 
-_Last updated by TF04._
+_Last updated by TF05._

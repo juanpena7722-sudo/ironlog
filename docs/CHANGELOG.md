@@ -1,5 +1,19 @@
 # Changelog
 
+## TF05 — Backup and local-data migration (2026-11-11)
+
+- Added: **Import mode** in Settings: backups import with `POST /backup/import` in `merge`
+  (default) or `replace` mode; replace asks for confirmation first. Import errors show the
+  server's `detail`.
+- Added: `LocalDataBanner`: after sign-in, data in `localStorage['ironlog:data']` from the
+  browser-only version can be imported once (`mode=merge`, `unitHint` = its stored unit). Success
+  removes the key; **Dismiss** is remembered in `ironlog:local-import-dismissed`.
+- Added: optional `canonicalUnit: 'kg'` in `AppDataSchema`; `GET /backup` sets it. `unitHintFor()`
+  sends `unitHint=kg` for marked files and the file's `goals.unit` for old unmarked ones, so an
+  export from an lb account is not converted twice.
+- Changed: `useReplaceData()` is replaced by `useImportData({ data, mode, unitHint })`. The
+  Settings confirmation box is a `role="alertdialog"` with focus on **Cancel**.
+
 ## TF04 — Data layer on the API (kg canonical) (2026-11-11)
 
 - Changed: `src/store.tsx` reads and writes through the API with TanStack Query hooks
