@@ -10,6 +10,7 @@ import {
   useFoods,
   useGoals,
   useHealth,
+  unitHintFor,
   useImportData,
   useSaveGoals,
   useWorkouts,
@@ -48,7 +49,7 @@ export default function Settings() {
   const [pending, setPending] = useState<Pending>(null)
   const [exportText, setExportText] = useState('')
   const [importMode, setImportMode] = useState<ImportMode>('merge')
-  const [replacement, setReplacement] = useState<AppData>()
+  const [replacement, setReplacement] = useState<{ data: AppData; unitHint: Goals['unit'] }>()
   const fileRef = useRef<HTMLInputElement>(null)
   const confirmId = useId()
   const deleteAccount = useDeleteAccount()
@@ -113,9 +114,9 @@ export default function Settings() {
       flash(errorMessage(error)),
     )
 
-  const sendImport = (data: AppData, mode: ImportMode) =>
+  const sendImport = (data: AppData, mode: ImportMode, unitHint: Goals['unit']) =>
     importData.mutate(
-      { data, mode },
+      { data, mode, unitHint },
       {
         onSuccess: () => {
           setLocal(null)
@@ -130,16 +131,19 @@ export default function Settings() {
     if (!file) return
     e.target.value = ''
     let data: AppData
+    let unitHint: Goals['unit']
     try {
-      data = normalize(JSON.parse(await file.text()) as AppData)
+      const parsed = JSON.parse(await file.text()) as Partial<AppData>
+      data = normalize(parsed)
+      unitHint = unitHintFor(parsed)
     } catch {
       flash('That file is not a valid IronLog backup.')
       return
     }
     if (importMode === 'merge') {
-      sendImport(data, 'merge')
+      sendImport(data, 'merge', unitHint)
     } else {
-      setReplacement(data)
+      setReplacement({ data, unitHint })
       setPending('import')
     }
   }
@@ -170,7 +174,7 @@ export default function Settings() {
         },
       )
     } else if (pending === 'import' && replacement) {
-      sendImport(replacement, 'replace')
+      sendImport(replacement.data, 'replace', replacement.unitHint)
     }
     cancel()
   }

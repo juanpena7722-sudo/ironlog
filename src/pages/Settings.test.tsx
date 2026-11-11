@@ -84,8 +84,9 @@ describe('your data', () => {
     foods: [],
     body: [CHECK_IN],
     health: [],
-    goals: GOALS,
+    goals: { ...GOALS, unit: 'lb' },
   }
+  const API_BACKUP: AppData = { ...BACKUP, canonicalUnit: 'kg' }
 
   function mockImport() {
     const imports: { search: string; body: unknown }[] = []
@@ -108,7 +109,7 @@ describe('your data', () => {
   })
 
   it('downloads the backup from the API', async () => {
-    server.use(http.get('/api/v1/backup', () => HttpResponse.json(BACKUP)))
+    server.use(http.get('/api/v1/backup', () => HttpResponse.json(API_BACKUP)))
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:backup')
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     renderWithProviders(<Settings />)
@@ -118,15 +119,15 @@ describe('your data', () => {
     expect(await screen.findByText('Backup downloaded.')).toBeDefined()
     expect(click).toHaveBeenCalledOnce()
     const blob = createObjectURL.mock.calls[0][0] as Blob
-    expect(JSON.parse(await blob.text())).toEqual(BACKUP)
+    expect(JSON.parse(await blob.text())).toEqual(API_BACKUP)
   })
 
-  function uploadBackup(user: ReturnType<typeof userEvent.setup>) {
-    const file = new File([JSON.stringify(BACKUP)], 'backup.json', { type: 'application/json' })
+  function uploadBackup(user: ReturnType<typeof userEvent.setup>, backup = API_BACKUP) {
+    const file = new File([JSON.stringify(backup)], 'backup.json', { type: 'application/json' })
     return user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, file)
   }
 
-  it('imports a backup file, merging by default', async () => {
+  it('imports an API backup in lb display units with unitHint=kg, merging by default', async () => {
     const imports = mockImport()
     renderWithProviders(<Settings />)
 
@@ -134,6 +135,16 @@ describe('your data', () => {
 
     expect(await screen.findByText('Data imported.')).toBeDefined()
     expect(imports).toEqual([{ search: '?mode=merge&unitHint=kg', body: BACKUP }])
+  })
+
+  it('imports an old browser-only lb export with unitHint=lb', async () => {
+    const imports = mockImport()
+    renderWithProviders(<Settings />)
+
+    await uploadBackup(userEvent.setup(), BACKUP)
+
+    expect(await screen.findByText('Data imported.')).toBeDefined()
+    expect(imports).toEqual([{ search: '?mode=merge&unitHint=lb', body: BACKUP }])
   })
 
   it('replace requires confirmation', async () => {
