@@ -79,7 +79,7 @@ Releases (versioning, tags, deployment) are decided and triggered by the owner o
 2. Each of the 6 pages has a passing smoke test.
 3. The build emits a separate chunk per page.
 
-### [ ] TF02 — API client and TanStack Query
+### [x] TF02 — API client and TanStack Query
 
 **Branch:** `feat/tf02-api-client`
 

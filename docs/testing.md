@@ -10,36 +10,43 @@ npm test               # run once
 npm run test:coverage  # run with coverage and thresholds
 ```
 
-| File                     | Covers                                                                                                                                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `shared/schemas.test.ts` | Valid and invalid cases for every Zod schema in `shared/schemas.ts`, including each numeric upper limit (valid at the limit, invalid just above) and NUL characters in names, ids and notes, plus the exported constants. |
-| `src/utils.test.ts`      | Every export of `src/utils.ts` with a fixed system time: `uid` (with and without `crypto.randomUUID`), date helpers, `e1rm`, workout and exercise volume, `round`, `num`, the date sorters and `totals`.                  |
-| `src/store.test.tsx`     | `normalize()`: empty input, non-array collections replaced, existing collections kept, goals merged over `DEFAULT_GOALS`, `version` always 1.                                                                             |
-| `src/pages/*.test.tsx`   | One smoke test per page (Dashboard, Workouts, Diet, Progress, Health, Settings): the page renders its `h1` inside `MemoryRouter` and `StoreProvider`.                                                                     |
-| `src/App.test.tsx`       | Each route shows the `Suspense` fallback, then lazy-loads its page.                                                                                                                                                       |
+| File                     | Covers                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `shared/schemas.test.ts` | Valid and invalid cases for every Zod schema in `shared/schemas.ts`, including each numeric upper limit (valid at the limit, invalid just above) and NUL characters in names, ids and notes, plus the exported constants.                                                                                                                                                                              |
+| `src/utils.test.ts`      | Every export of `src/utils.ts` with a fixed system time: `uid` (with and without `crypto.randomUUID`), date helpers, `e1rm`, workout and exercise volume, `round`, `num`, the date sorters and `totals`.                                                                                                                                                                                               |
+| `src/store.test.tsx`     | `normalize()`: empty input, non-array collections replaced, existing collections kept, goals merged over `DEFAULT_GOALS`, `version` always 1.                                                                                                                                                                                                                                                          |
+| `src/pages/*.test.tsx`   | One smoke test per page (Dashboard, Workouts, Diet, Progress, Health, Settings): the page renders its `h1` inside `MemoryRouter` and `StoreProvider`.                                                                                                                                                                                                                                                  |
+| `src/App.test.tsx`       | Each route shows the `Suspense` fallback, then lazy-loads its page.                                                                                                                                                                                                                                                                                                                                    |
+| `src/api/client.test.ts` | `apiRequest`: successful response parsed with `GoalsSchema`; request sent to `/api/v1/goals` with `same-origin` credentials; Problem Details to `ApiError`; status-text fallback for a non-Problem Details body; malformed response rejected with `ZodError`; network failure rejected with `TypeError`. `shouldRetry` with a `QueryClient`: one retry on 503, none on 401, none for a non-`ApiError`. |
 
 ### Test setup
 
 `src/test/setup.ts` runs before every frontend test file. It:
 
-- starts an MSW server (`msw/node`, `setupServer()`) with no handlers and
-  `onUnhandledRequest: 'error'`, so any real network request fails the test;
+- starts an MSW server (`msw/node`, `setupServer(...handlers)`) with the default handlers from
+  `src/test/handlers.ts` and `onUnhandledRequest: 'error'`, so any real network request fails
+  the test;
 - after each test, unmounts rendered components (`cleanup`), resets MSW handlers and clears
   `localStorage`;
 - stubs `ResizeObserver`, which jsdom lacks and Recharts' `ResponsiveContainer` needs.
+
+`src/test/handlers.ts` exports `GOALS` (a valid `Goals` object) and `handlers`, which answers
+`GET /api/v1/goals` with `GOALS`. `setup.ts` exports `server`; a test overrides a handler with
+`server.use(...)`, and the override is reset after the test.
 
 Component tests use Testing Library (`@testing-library/react`, `@testing-library/user-event`).
 
 ## Coverage
 
 Coverage uses the v8 provider and writes `text` and `html` reports to `coverage/`
-(git-ignored). It measures `shared/**/*.ts` and `src/utils.ts`, excluding test files.
+(git-ignored). It measures `shared/**/*.ts`, `src/utils.ts` and `src/api/**/*.ts`, excluding test files.
 
 | Scope          | Lines | Branches |
 | -------------- | ----- | -------- |
 | Overall        | 80 %  | 75 %     |
 | `shared/**`    | 90 %  | 85 %     |
 | `src/utils.ts` | 90 %  | 85 %     |
+| `src/api/**`   | 90 %  | 85 %     |
 
 ## Backend tests
 
@@ -104,4 +111,4 @@ Coverage measures `server/src/**/*.ts` except test files, `src/server.ts` (the e
 the generated Prisma client (`src/generated/**`),
 with thresholds of 90 % lines and 85 % branches. Reports go to `server/coverage/` (git-ignored).
 
-_Last updated by TF01._
+_Last updated by TF02._
