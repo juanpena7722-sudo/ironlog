@@ -111,7 +111,7 @@ Releases (versioning, tags, deployment) are decided and triggered by the owner o
 1. Tests: register/login redirect, validation messages, 401 redirects to login, logout clears session and query cache.
 2. Forms are fully keyboard operable.
 
-### [?] TF04 — Data layer on the API (kg canonical)
+### [x] TF04 — Data layer on the API (kg canonical)
 
 **Branch:** `feat/tf04-api-data-layer`
 
