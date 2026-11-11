@@ -51,6 +51,21 @@ The browser sends it back automatically; `Authorization: Bearer` headers are ign
 Endpoints marked `Auth: required` return 401 (`Not authenticated`) when the cookie is missing,
 expired, tampered with or signed with another secret.
 
+The auth request bodies are validated with `RegisterSchema`, `LoginSchema` and
+`DeleteAccountSchema` from `shared/schemas.ts`, the same schemas the login, register and
+delete-account forms use. Their 400 `errors` entries carry these messages:
+
+| `path`     | Rule broken                         | `message`                                 |
+| ---------- | ----------------------------------- | ----------------------------------------- |
+| `email`    | Not a valid email                   | `Enter a valid email address`             |
+| `email`    | Over 254 characters                 | `Email is too long`                       |
+| `password` | Empty                               | `Enter your password`                     |
+| `password` | Over 128 characters                 | `Password must be at most 128 characters` |
+| `password` | Under 10 characters (register only) | `Password must be at least 10 characters` |
+
+A field of the wrong type (for example a number) keeps the default Zod message, and a NUL
+character returns `Must not contain NUL characters`.
+
 ## Request protection
 
 | Rule              | Applies to                                    | Response                                                                                                                           |
@@ -723,4 +738,4 @@ Example 200 body:
 An export larger than 5 MB cannot be imported. The import times out after 120 s and then
 returns 500 with no changes.
 
-_Last updated by TB09._
+_Last updated by TF03._
