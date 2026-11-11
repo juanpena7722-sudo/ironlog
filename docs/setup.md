@@ -43,6 +43,7 @@ npm --prefix server run dev
 client to `server/src/generated/prisma` (git-ignored).
 
 The server listens on `http://127.0.0.1:3000` (`GET /api/v1/health` returns `{"status":"ok"}`).
+Outside production, `GET /docs` returns the OpenAPI JSON document.
 
 ### argon2 and glibc
 
@@ -113,6 +114,38 @@ in. The seed runs under tsx and is not part of the server `typecheck`.
 `db:reset:test` is destructive. Prisma 7 refuses to run `migrate reset` when it detects that an
 AI agent invoked it, so only the owner runs this script.
 
+## Production stack
+
+The production stack (gateway, API and database; see [`architecture.md`](./architecture.md))
+needs Docker with Compose v2. Run it from the repo root:
+
+```bash
+cp .env.example .env            # then set POSTGRES_PASSWORD and JWT_SECRET
+npm ci && npm run build         # the gateway serves ./dist, so build it first
+docker compose -f docker-compose.prod.yml up -d --build --wait
+```
+
+Compose reads `.env` in the repo root. `POSTGRES_PASSWORD` and `JWT_SECRET` are required: if
+either is unset or empty, Compose stops with an error before starting anything. The API applies
+pending migrations on start.
+
+| Command                                              | What it does                                             |
+| ---------------------------------------------------- | -------------------------------------------------------- |
+| `docker compose -f docker-compose.prod.yml ps`       | Shows the services and their health.                     |
+| `docker compose -f docker-compose.prod.yml logs api` | Shows the API logs (JSON, secrets redacted).             |
+| `docker compose -f docker-compose.prod.yml down`     | Stops the stack and keeps the data.                      |
+| `docker compose -f docker-compose.prod.yml down -v`  | Stops the stack and deletes the database and Caddy data. |
+
+Only the gateway publishes ports (`80` and `443`). Check the stack with:
+
+```bash
+curl -i http://localhost/                # 200, the app
+curl -i http://localhost/api/v1/health   # 200, {"status":"ok"} through the gateway
+```
+
+The production stack and the development `postgres` service use different Compose projects
+(`ironlog-prod` and the repo directory name) and different volumes, so they do not share data.
+
 ## Path alias
 
 `@shared/*` resolves to `shared/*`. It is defined in `vite.config.ts` (`resolve.alias`) and in
@@ -120,7 +153,19 @@ AI agent invoked it, so only the owner runs this script.
 
 ## Environment variables
 
-The frontend uses none; the root `.env.example` is empty.
+The frontend uses none.
+
+The production stack reads these from `.env` in the repo root (template in the root
+`.env.example`):
+
+| Variable            | Required | Example / default                                                                                       |
+| ------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_PASSWORD` | Yes      | URL-safe characters only, because it is placed in the API's `DATABASE_URL`; e.g. `openssl rand -hex 24` |
+| `JWT_SECRET`        | Yes      | At least 32 characters, e.g. `openssl rand -base64 48`                                                  |
+| `SITE_ADDRESS`      | No       | `:80` (default, plain HTTP); a domain name such as `ironlog.example.com` turns on automatic HTTPS       |
+
+Inside the stack, the API gets `NODE_ENV=production`, `PORT=3000` and
+`DATABASE_URL=postgresql://ironlog:<POSTGRES_PASSWORD>@db:5432/ironlog`.
 
 The backend reads these from the environment (`server/.env` in development; template in
 `server/.env.example`). Startup fails if any is invalid.
@@ -165,4 +210,4 @@ npm audit --omit=dev --audit-level=high
 
 The audit steps fail only on high or critical advisories in production dependencies.
 
-_Last updated by TB03._
+_Last updated by TB09._

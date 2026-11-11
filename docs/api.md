@@ -1,7 +1,10 @@
 # API
 
 All endpoints live under `/api/v1` and return JSON. The browser reaches them through the
-gateway on the same origin; the API itself listens on `127.0.0.1` only.
+gateway on the same origin; the API itself is never published (`127.0.0.1` in development, a
+private container network in production).
+
+Outside production, `GET /docs` returns the OpenAPI JSON document. In production it returns 404.
 
 ## Errors
 
@@ -50,12 +53,20 @@ expired, tampered with or signed with another secret.
 
 ## Request protection
 
-| Rule            | Applies to                                    | Response                                                                                                                           |
-| --------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Origin check    | Every request except `GET`, `HEAD`, `OPTIONS` | 403 `Cross-origin request rejected` if `Origin` is present and its host differs from the request `Host` (including `Origin: null`) |
-| Auth rate limit | Each `/api/v1/auth/*` route, per client IP    | 429 after 10 requests in 1 minute, with a `Retry-After` header                                                                     |
+| Rule              | Applies to                                    | Response                                                                                                                           |
+| ----------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Origin check      | Every request except `GET`, `HEAD`, `OPTIONS` | 403 `Cross-origin request rejected` if `Origin` is present and its host differs from the request `Host` (including `Origin: null`) |
+| Auth rate limit   | Each `/api/v1/auth/*` route, per client IP    | 429 after 10 requests in 1 minute, with a `Retry-After` header                                                                     |
+| Global rate limit | Every other route, per client IP              | 429 after 300 requests in 1 minute, with a `Retry-After` header                                                                    |
+| Body limit        | Every request body                            | 413 `Request body is too large` over 100 KB (5 MB for `POST /api/v1/backup/import`)                                                |
 
 Requests without an `Origin` header are not blocked by the Origin check.
+
+Every response carries the `@fastify/helmet` security headers (including
+`Content-Security-Policy`) and `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
+`X-RateLimit-Reset`. Through the gateway, `deploy/Caddyfile` overwrites the headers it also
+sets, such as `Content-Security-Policy` and `X-Frame-Options` (see
+[`architecture.md`](./architecture.md#gateway)).
 
 ## Endpoints
 
@@ -712,4 +723,4 @@ Example 200 body:
 An export larger than 5 MB cannot be imported. The import times out after 120 s and then
 returns 500 with no changes.
 
-_Last updated by TB08._
+_Last updated by TB09._
