@@ -11,16 +11,18 @@ export default defineConfig({
   },
   test: {
     include: ['shared/**/*.test.ts', 'src/**/*.test.{ts,tsx}'],
+    environment: 'jsdom',
+    setupFiles: ['src/test/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      // Widened to src/ in TF01, when the frontend test harness exists.
-      include: ['shared/**/*.ts'],
+      include: ['shared/**/*.ts', 'src/utils.ts'],
       exclude: ['**/*.test.ts'],
       thresholds: {
         lines: 80,
         branches: 75,
         'shared/**': { lines: 90, branches: 85 },
+        'src/utils.ts': { lines: 90, branches: 85 },
       },
     },
   },

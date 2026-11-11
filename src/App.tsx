@@ -1,10 +1,12 @@
+import { Suspense, lazy } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
-import Dashboard from './pages/Dashboard'
-import Workouts from './pages/Workouts'
-import Diet from './pages/Diet'
-import Progress from './pages/Progress'
-import Health from './pages/Health'
-import Settings from './pages/Settings'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Workouts = lazy(() => import('./pages/Workouts'))
+const Diet = lazy(() => import('./pages/Diet'))
+const Progress = lazy(() => import('./pages/Progress'))
+const Health = lazy(() => import('./pages/Health'))
+const Settings = lazy(() => import('./pages/Settings'))
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '◎' },
@@ -32,15 +34,17 @@ export default function App() {
         ))}
       </nav>
       <main className="main">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/workouts" element={<Workouts />} />
-          <Route path="/diet" element={<Diet />} />
-          <Route path="/progress" element={<Progress />} />
-          <Route path="/health" element={<Health />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<p className="muted">Loading…</p>}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/workouts" element={<Workouts />} />
+            <Route path="/diet" element={<Diet />} />
+            <Route path="/progress" element={<Progress />} />
+            <Route path="/health" element={<Health />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </main>
     </div>
   )

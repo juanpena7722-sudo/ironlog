@@ -35,7 +35,7 @@ function load(): AppData {
 }
 
 /** Fills in missing fields so older or hand-edited data still loads. */
-function normalize(input: Partial<AppData>): AppData {
+export function normalize(input: Partial<AppData>): AppData {
   return {
     version: 1,
     workouts: Array.isArray(input.workouts) ? input.workouts : [],
