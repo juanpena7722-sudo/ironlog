@@ -121,17 +121,69 @@ describe('your data', () => {
     expect(JSON.parse(await blob.text())).toEqual(BACKUP)
   })
 
-  it('imports a backup file, replacing the data', async () => {
+  function uploadBackup(user: ReturnType<typeof userEvent.setup>) {
+    const file = new File([JSON.stringify(BACKUP)], 'backup.json', { type: 'application/json' })
+    return user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, file)
+  }
+
+  it('imports a backup file, merging by default', async () => {
     const imports = mockImport()
     renderWithProviders(<Settings />)
-    const file = new File([JSON.stringify(BACKUP)], 'backup.json', { type: 'application/json' })
 
-    await userEvent
-      .setup()
-      .upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, file)
+    await uploadBackup(userEvent.setup())
 
     expect(await screen.findByText('Data imported.')).toBeDefined()
-    expect(imports).toEqual([{ search: '?mode=replace', body: BACKUP }])
+    expect(imports).toEqual([{ search: '?mode=merge&unitHint=kg', body: BACKUP }])
+  })
+
+  it('replace requires confirmation', async () => {
+    const imports = mockImport()
+    renderWithProviders(<Settings />)
+    const user = userEvent.setup()
+
+    await user.selectOptions(screen.getByLabelText('Import mode'), 'replace')
+    await uploadBackup(user)
+
+    const dialog = await screen.findByRole('alertdialog', {
+      name: 'Replace all your current data with this backup? This can’t be undone.',
+    })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
+    expect(dialog).toBeDefined()
+    expect(imports).toEqual([])
+
+    await user.click(screen.getByRole('button', { name: 'Yes, continue' }))
+
+    expect(await screen.findByText('Data imported.')).toBeDefined()
+    expect(imports).toEqual([{ search: '?mode=replace&unitHint=kg', body: BACKUP }])
+  })
+
+  it('does not replace the data when the confirmation is cancelled', async () => {
+    const imports = mockImport()
+    renderWithProviders(<Settings />)
+    const user = userEvent.setup()
+
+    await user.selectOptions(screen.getByLabelText('Import mode'), 'replace')
+    await uploadBackup(user)
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(imports).toEqual([])
+  })
+
+  it('shows the error when the import fails', async () => {
+    server.use(
+      http.post('/api/v1/backup/import', () =>
+        HttpResponse.json(
+          { type: 'about:blank', title: 'Bad Request', status: 400, detail: 'Invalid backup' },
+          { status: 400 },
+        ),
+      ),
+    )
+    renderWithProviders(<Settings />)
+
+    await uploadBackup(userEvent.setup())
+
+    expect(await screen.findByText('Invalid backup')).toBeDefined()
   })
 
   it('rejects an invalid backup file', async () => {
@@ -154,6 +206,7 @@ describe('your data', () => {
     await user.click(screen.getByRole('button', { name: 'Yes, continue' }))
 
     expect(await screen.findByText('Demo data loaded.')).toBeDefined()
+    expect(imports[0].search).toBe('?mode=replace&unitHint=kg')
     const body = imports[0].body as AppData
     expect(body.workouts.length).toBeGreaterThan(0)
     expect(body.body.length).toBeGreaterThan(0)
@@ -198,7 +251,7 @@ describe('your data', () => {
 
     expect(await screen.findByText('All logs cleared.')).toBeDefined()
     expect(imports[0]).toEqual({
-      search: '?mode=replace',
+      search: '?mode=replace&unitHint=kg',
       body: { version: 1, workouts: [], foods: [], body: [], health: [], goals: GOALS },
     })
   })

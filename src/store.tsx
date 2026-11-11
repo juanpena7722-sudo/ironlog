@@ -115,12 +115,18 @@ export const useSaveGoals = () =>
     apiRequest('/goals', GoalsSchema, jsonRequest('PUT', goals)),
   )
 
-export function useReplaceData() {
+type ImportRequest = { data: AppData; mode: 'merge' | 'replace'; unitHint?: Goals['unit'] }
+
+export function useImportData() {
   const queryClient = useQueryClient()
   return useMutation({
     // The import summary is not shown, so its body is not parsed.
-    mutationFn: (data: AppData) =>
-      apiRequest('/backup/import?mode=replace', z.unknown(), jsonRequest('POST', data)),
+    mutationFn: ({ data, mode, unitHint = 'kg' }: ImportRequest) =>
+      apiRequest(
+        `/backup/import?mode=${mode}&unitHint=${unitHint}`,
+        z.unknown(),
+        jsonRequest('POST', data),
+      ),
     onSuccess: () => queryClient.invalidateQueries(),
   })
 }
