@@ -1,5 +1,23 @@
 # Changelog
 
+## TB09 — Hardening, gateway and production stack (2026-11-11)
+
+- Added: `@fastify/helmet` (default CSP), a global rate limit of 300 requests per minute per IP,
+  a 100 KB body limit (backup import keeps 5 MB) and graceful shutdown on `SIGINT` / `SIGTERM`.
+- Added: `GET /docs` returns the OpenAPI JSON document (`@fastify/swagger`) outside production;
+  404 in production.
+- Added: `server/Dockerfile` (multi-stage, `node:26-alpine`, non-root, runs
+  `prisma migrate deploy` on start), `deploy/Caddyfile` (serves `dist/`, proxies `/api/v1/*` to
+  `api:3000`, SPA fallback, security headers) and `docker-compose.prod.yml` (only the gateway
+  publishes ports; `api` and `db` on an internal network).
+- Added: root `.dockerignore` and the production stack variables (`POSTGRES_PASSWORD`,
+  `JWT_SECRET`, `SITE_ADDRESS`) in the root `.env.example`.
+- Changed: in production the API listens on `0.0.0.0` and trusts `X-Forwarded-For`
+  (`trustProxy`); elsewhere it still listens on `127.0.0.1`.
+- Changed: `prisma` moved from dev dependencies to dependencies (runtime migrations).
+- Security: log redaction now covers `authorization`, `cookie` and `set-cookie` under any
+  `headers` object (`*.headers.*`), not only `req.headers` / `res.headers`.
+
 ## TB08 — Backup export/import API (2026-11-08)
 
 - Added: `GET /api/v1/backup` (all of the user's data as an `AppData` v1 attachment

@@ -132,7 +132,7 @@ export function registerAuth(app: FastifyInstance, env: Env): void {
     sign: { algorithm: 'HS256', expiresIn: SESSION_TTL_SECONDS },
     verify: { algorithms: ['HS256'], onlyCookie: true },
   })
-  app.register(rateLimit, { global: false })
+  app.register(rateLimit, { max: 300, timeWindow: '1 minute' })
 
   app.decorateRequest('userId', '')
   app.decorate('requireAuth', async (request: FastifyRequest) => {

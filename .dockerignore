@@ -1,0 +1,15 @@
+# Build context for server/Dockerfile is the repository root.
+# The image builds server/dist itself; the gateway bind-mounts ./dist at runtime.
+**/node_modules
+.git
+.github
+.claude
+**/dist
+**/dist-ssr
+server/src/generated
+**/coverage
+**/playwright-report
+**/test-results
+**/*.log
+**/.env
+**/.env.*
