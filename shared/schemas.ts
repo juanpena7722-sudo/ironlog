@@ -163,6 +163,8 @@ export const AppDataSchema = z.object({
   body: z.array(BodyEntrySchema),
   health: z.array(HealthEntrySchema),
   goals: GoalsSchema,
+  // Set only by API exports (kg and cm). Browser-only exports stored values in goals.unit.
+  canonicalUnit: z.literal('kg').optional(),
 })
 
 export type ISODate = z.infer<typeof ISODateSchema>

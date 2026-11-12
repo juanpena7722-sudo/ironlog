@@ -329,6 +329,7 @@ describe('AppDataSchema', () => {
     expect(AppDataSchema.parse(appData)).toEqual(appData)
     const empty = { version: 1, workouts: [], foods: [], body: [], health: [], goals }
     expect(AppDataSchema.safeParse(empty).success).toBe(true)
+    expect(AppDataSchema.safeParse({ ...appData, canonicalUnit: 'kg' }).success).toBe(true)
   })
 
   it.each([
@@ -339,6 +340,7 @@ describe('AppDataSchema', () => {
     ['an invalid nested health entry', { ...appData, health: [{ ...health, energy: 9 }] }],
     ['invalid goals', { ...appData, goals: { ...goals, unit: 'st' } }],
     ['a missing collection', { ...appData, foods: undefined }],
+    ['a canonical unit other than kg', { ...appData, canonicalUnit: 'lb' }],
     ['a non-object value', 'not json'],
   ])('rejects a backup with %s', (_label, value) => {
     expect(AppDataSchema.safeParse(value).success).toBe(false)

@@ -9,10 +9,11 @@ A web app for bodybuilders to track workouts, diet, body progress and health.
 - **Diet:** per-meal food log, calories from macros, quick re-add, 14-day calorie chart
 - **Progress:** weigh-ins, body fat and measurements with trend charts
 - **Health:** sleep, water, resting HR, steps, energy and notes
-- **Settings:** targets, kg/lb units, macro suggestions, JSON backup export/import, demo data
+- **Settings:** targets, kg/lb units, macro suggestions, JSON backup export and import (merge or replace), demo data
 
 Data is stored per user account through the API (`/api/v1`) in PostgreSQL, including the kg/lb
-unit preference.
+unit preference. After sign-in, data saved in the browser by the earlier browser-only
+version can be imported into the account once.
 
 ## Tech stack
 

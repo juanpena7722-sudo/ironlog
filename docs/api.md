@@ -665,14 +665,15 @@ Both `/api/v1/backup` routes require a session and only read or change the curre
 Matches `AppDataSchema` in `shared/schemas.ts`. Unknown fields are ignored. Weights are kg and
 measurements cm, unless the import says otherwise with `unitHint=lb`.
 
-| Field      | Type   | Rules                                     |
-| ---------- | ------ | ----------------------------------------- |
-| `version`  | number | Must be `1`                               |
-| `workouts` | array  | `Workout` objects, as in the workouts API |
-| `foods`    | array  | `FoodEntry` objects                       |
-| `body`     | array  | `BodyEntry` objects                       |
-| `health`   | array  | `HealthEntry` objects                     |
-| `goals`    | object | `Goals`                                   |
+| Field           | Type   | Rules                                                                                             |
+| --------------- | ------ | ------------------------------------------------------------------------------------------------- |
+| `version`       | number | Must be `1`                                                                                       |
+| `workouts`      | array  | `Workout` objects, as in the workouts API                                                         |
+| `foods`         | array  | `FoodEntry` objects                                                                               |
+| `body`          | array  | `BodyEntry` objects                                                                               |
+| `health`        | array  | `HealthEntry` objects                                                                             |
+| `goals`         | object | `Goals`                                                                                           |
+| `canonicalUnit` | string | Optional. Only `kg`. Marks a file whose weights are kg and lengths cm, whatever `goals.unit` says |
 
 Each entry has an `id` (1–100 characters). Collections are newest first.
 
@@ -681,7 +682,8 @@ Each entry has an `id` (1–100 characters). Collections are newest first.
 Auth: required
 
 Returns all of the user's workouts, foods, body entries, health entries and goals (the default
-goals if none are stored). The response has
+goals if none are stored), with `canonicalUnit: 'kg'`: weights are kg and lengths cm even when
+`goals.unit` is `lb`. The response has
 `Content-Disposition: attachment; filename="ironlog-backup-YYYY-MM-DD.json"`, with the current
 UTC date.
 
@@ -689,7 +691,7 @@ UTC date.
 
 | Status | Body                                           |
 | ------ | ---------------------------------------------- |
-| 200    | `AppData`                                      |
+| 200    | `AppData` with `canonicalUnit: 'kg'`           |
 | 401    | Problem Details, `detail`: `Not authenticated` |
 
 ### POST /api/v1/backup/import
@@ -714,6 +716,7 @@ changes.
 | Health | One entry per day: an entry for a date the user already has is skipped.                                                                                                                |
 | Goals  | `replace` overwrites the goals; `merge` keeps the existing goals and counts the file's goals as skipped.                                                                               |
 | Limits | The shared limits apply after any lb conversion (for example 4000 lb is accepted as 1814.37 kg).                                                                                       |
+| Units  | The server converts only by `unitHint`; `canonicalUnit` is validated but does not change the conversion. The frontend sends `unitHint=kg` for files with `canonicalUnit: 'kg'`.        |
 
 **Responses**
 
@@ -738,4 +741,4 @@ Example 200 body:
 An export larger than 5 MB cannot be imported. The import times out after 120 s and then
 returns 500 with no changes.
 
-_Last updated by TF03._
+_Last updated by TF05._

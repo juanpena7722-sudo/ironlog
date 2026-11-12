@@ -349,7 +349,9 @@ the prefix `/api/v1/backup` (reference in [`api.md`](./api.md#backup)).
 - **Export.** Reads the user's workouts (with `WORKOUT_INCLUDE`), foods, body and health entries
   and goals in parallel, ordered newest first like the list routes, and maps them with the
   existing `toWorkout()`, `toFoodEntry()`, `toBodyEntry()`, `toHealthEntry()` and `toGoals()`.
-  A user without a goals row gets `DEFAULT_GOALS`. The filename uses `toISODate(new Date())`.
+  A user without a goals row gets `DEFAULT_GOALS`. The body adds `canonicalUnit: 'kg'`, the
+  optional `AppDataSchema` marker for files stored in kg and cm. The filename uses
+  `toISODate(new Date())`.
 - **Validation.** The query is parsed with `IMPORT_QUERY_SCHEMA` (`mode`, `unitHint` default
   `kg`) and the body with `AppDataSchema` from `shared/`. The route sets
   `bodyLimit: IMPORT_BODY_LIMIT` (5 MB); Fastify returns 413 above it.
@@ -417,4 +419,4 @@ response outside `development`.
 Route handlers throw `app.httpErrors.<name>(detail)` for expected failures (for example
 `app.httpErrors.conflict('Email already registered')`) and let the global handler format them.
 
-_Last updated by TF03._
+_Last updated by TF05._

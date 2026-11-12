@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { errorMessage, useLogout, useSession } from './api/auth'
+import LocalDataBanner from './components/LocalDataBanner'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Workouts = lazy(() => import('./pages/Workouts'))
@@ -73,6 +74,7 @@ function ProtectedShell() {
             {errorMessage(logout.error)}
           </p>
         )}
+        <LocalDataBanner />
         <Suspense fallback={LOADING}>
           <Outlet />
         </Suspense>

@@ -261,6 +261,7 @@ export async function backupRoutes(app: FastifyInstance) {
       body: body.map(toBodyEntry),
       health: health.map(toHealthEntry),
       goals: goals ? toGoals(goals) : DEFAULT_GOALS,
+      canonicalUnit: 'kg',
     }
     const filename = `ironlog-backup-${toISODate(new Date())}.json`
     return reply.header('content-disposition', `attachment; filename="${filename}"`).send(data)

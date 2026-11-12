@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { AppDataSchema, DeleteAccountSchema } from '@shared/schemas'
 import { errorMessage, useDeleteAccount } from '../api/auth'
@@ -10,7 +10,8 @@ import {
   useFoods,
   useGoals,
   useHealth,
-  useReplaceData,
+  unitHintFor,
+  useImportData,
   useSaveGoals,
   useWorkouts,
 } from '../store'
@@ -20,7 +21,14 @@ import { makeDemoData } from '../demo'
 import { byDateAsc, round } from '../utils'
 import { fromDisplayWeight, toDisplayWeight } from '../units'
 
-type Pending = 'reset' | 'demo' | null
+type Pending = 'reset' | 'demo' | 'import' | null
+type ImportMode = 'merge' | 'replace'
+
+const CONFIRM_TEXT = {
+  reset: 'Delete every workout, food, check-in and health log? Targets are kept.',
+  demo: 'Replace all your current data with 60 days of sample data?',
+  import: 'Replace all your current data with this backup?',
+}
 
 export default function Settings() {
   const saved = useGoals().data
@@ -29,7 +37,7 @@ export default function Settings() {
   const body = useBody().data ?? []
   const health = useHealth().data ?? []
   const saveGoals = useSaveGoals()
-  const replaceData = useReplaceData()
+  const importData = useImportData()
   // targetWeight is in the display unit here. Until edited, the form shows the saved goals.
   const [edited, setLocal] = useState<Goals | null>(null)
   const current = saved ?? DEFAULT_GOALS
@@ -40,7 +48,10 @@ export default function Settings() {
   const [msg, setMsg] = useState('')
   const [pending, setPending] = useState<Pending>(null)
   const [exportText, setExportText] = useState('')
+  const [importMode, setImportMode] = useState<ImportMode>('merge')
+  const [replacement, setReplacement] = useState<{ data: AppData; unitHint: Goals['unit'] }>()
   const fileRef = useRef<HTMLInputElement>(null)
+  const confirmId = useId()
   const deleteAccount = useDeleteAccount()
   const [isDeleting, setIsDeleting] = useState(false)
   const [passwordError, setPasswordError] = useState<string>()
@@ -103,36 +114,69 @@ export default function Settings() {
       flash(errorMessage(error)),
     )
 
+  const sendImport = (data: AppData, mode: ImportMode, unitHint: Goals['unit']) =>
+    importData.mutate(
+      { data, mode, unitHint },
+      {
+        onSuccess: () => {
+          setLocal(null)
+          flash('Data imported.')
+        },
+        onError: (error) => flash(errorMessage(error)),
+      },
+    )
+
   const doImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    e.target.value = ''
+    let data: AppData
+    let unitHint: Goals['unit']
     try {
-      const parsed = JSON.parse(await file.text()) as AppData
-      await replaceData.mutateAsync(normalize(parsed))
-      setLocal(null)
-      flash('Data imported.')
+      const parsed = JSON.parse(await file.text()) as Partial<AppData>
+      data = normalize(parsed)
+      unitHint = unitHintFor(parsed)
     } catch {
       flash('That file is not a valid IronLog backup.')
+      return
     }
-    e.target.value = ''
+    if (importMode === 'merge') {
+      sendImport(data, 'merge', unitHint)
+    } else {
+      setReplacement({ data, unitHint })
+      setPending('import')
+    }
+  }
+
+  const cancel = () => {
+    setPending(null)
+    setReplacement(undefined)
   }
 
   const confirm = () => {
     // Clearing keeps the saved goals, so it waits until they have loaded.
     if (pending === 'reset' && saved) {
-      replaceData.mutate(
-        { version: 1, workouts: [], foods: [], body: [], health: [], goals: saved },
+      importData.mutate(
+        {
+          data: { version: 1, workouts: [], foods: [], body: [], health: [], goals: saved },
+          mode: 'replace',
+        },
         { onSuccess: () => flash('All logs cleared.') },
       )
     } else if (pending === 'demo') {
-      replaceData.mutate(makeDemoData(), {
-        onSuccess: () => {
-          setLocal(null)
-          flash('Demo data loaded.')
+      importData.mutate(
+        { data: makeDemoData(), mode: 'replace' },
+        {
+          onSuccess: () => {
+            setLocal(null)
+            flash('Demo data loaded.')
+          },
         },
-      })
+      )
+    } else if (pending === 'import' && replacement) {
+      sendImport(replacement.data, 'replace', replacement.unitHint)
     }
-    setPending(null)
+    cancel()
   }
 
   const submitDelete = (e: FormEvent<HTMLFormElement>) => {
@@ -232,6 +276,16 @@ export default function Settings() {
             {health.length} health logs
           </p>
           <div className="actions">
+            <label>
+              Import mode
+              <select
+                value={importMode}
+                onChange={(e) => setImportMode(e.target.value as ImportMode)}
+              >
+                <option value="merge">Merge (add new entries)</option>
+                <option value="replace">Replace all data</option>
+              </select>
+            </label>
             <button className="ghost" onClick={doExport}>
               Export backup
             </button>
@@ -255,13 +309,8 @@ export default function Settings() {
             </button>
           </div>
           {pending && (
-            <div className="confirm">
-              <p>
-                {pending === 'reset'
-                  ? 'Delete every workout, food, check-in and health log? Targets are kept.'
-                  : 'Replace all your current data with 60 days of sample data?'}{' '}
-                This can’t be undone.
-              </p>
+            <div className="confirm" role="alertdialog" aria-labelledby={confirmId}>
+              <p id={confirmId}>{CONFIRM_TEXT[pending]} This can’t be undone.</p>
               <div className="actions">
                 <button
                   className="danger-solid"
@@ -270,7 +319,7 @@ export default function Settings() {
                 >
                   Yes, continue
                 </button>
-                <button className="ghost" onClick={() => setPending(null)}>
+                <button className="ghost" autoFocus onClick={cancel}>
                   Cancel
                 </button>
               </div>

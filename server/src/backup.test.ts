@@ -140,7 +140,10 @@ describe('GET /backup', () => {
     expect(response.headers['content-disposition']).toBe(
       'attachment; filename="ironlog-backup-2026-07-01.json"',
     )
-    expect(withoutIds(AppDataSchema.parse(response.json()))).toEqual(withoutIds(BACKUP))
+    expect(withoutIds(AppDataSchema.parse(response.json()))).toEqual({
+      ...withoutIds(BACKUP),
+      canonicalUnit: 'kg',
+    })
   })
 
   it('returns empty collections and default goals for a user without data', async () => {
@@ -151,6 +154,7 @@ describe('GET /backup', () => {
       body: [],
       health: [],
       goals: DEFAULT_GOALS,
+      canonicalUnit: 'kg',
     })
   })
 
@@ -253,7 +257,10 @@ describe('POST /backup/import', () => {
     }
     const response = await importBackup(replacement, 'mode=replace')
     expect(response.statusCode).toBe(200)
-    expect(withoutIds(await exportBackup())).toEqual(withoutIds(replacement))
+    expect(withoutIds(await exportBackup())).toEqual({
+      ...withoutIds(replacement),
+      canonicalUnit: 'kg',
+    })
     expect(await exportBackup(other)).toEqual(otherBefore)
   })
 

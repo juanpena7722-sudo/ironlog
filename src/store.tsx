@@ -33,6 +33,11 @@ export function normalize(input: Partial<AppData>): AppData {
   }
 }
 
+/** API exports are kg/cm; data from the browser-only version is in its display unit. */
+export function unitHintFor(input: Partial<AppData>): Goals['unit'] {
+  return input.canonicalUnit === 'kg' ? 'kg' : normalize(input).goals.unit
+}
+
 // List endpoints default to recent days only; pages need the whole history.
 const ALL_TIME: ISODate = '1970-01-01'
 const RECENT_FOODS_LIMIT = 12
@@ -115,12 +120,18 @@ export const useSaveGoals = () =>
     apiRequest('/goals', GoalsSchema, jsonRequest('PUT', goals)),
   )
 
-export function useReplaceData() {
+type ImportRequest = { data: AppData; mode: 'merge' | 'replace'; unitHint?: Goals['unit'] }
+
+export function useImportData() {
   const queryClient = useQueryClient()
   return useMutation({
     // The import summary is not shown, so its body is not parsed.
-    mutationFn: (data: AppData) =>
-      apiRequest('/backup/import?mode=replace', z.unknown(), jsonRequest('POST', data)),
+    mutationFn: ({ data, mode, unitHint = 'kg' }: ImportRequest) =>
+      apiRequest(
+        `/backup/import?mode=${mode}&unitHint=${unitHint}`,
+        z.unknown(),
+        jsonRequest('POST', data),
+      ),
     onSuccess: () => queryClient.invalidateQueries(),
   })
 }
