@@ -36,7 +36,8 @@ a {
   color: var(--accent);
   text-decoration: none;
 }
-a:hover {
+a:hover,
+p a {
   text-decoration: underline;
 }
 h1,
@@ -387,6 +388,7 @@ table.sets input {
 
 /* ---------- tables & lists ---------- */
 .table-wrap {
+  position: relative;
   overflow-x: auto;
 }
 table {
