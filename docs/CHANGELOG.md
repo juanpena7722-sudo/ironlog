@@ -1,5 +1,24 @@
 # Changelog
 
+## TF07 — End-to-end and accessibility suite in CI (2026-11-11)
+
+- Added: Playwright suite in `e2e/` (`npm run test:e2e`) against the production stack from
+  `docker-compose.prod.yml`, in two Chromium projects: `desktop` and `mobile` (390 × 844). It
+  covers every critical journey: register and log in, logout redirect, workout and PR, foods and
+  macros, weigh-ins and chart, health entry, kg ↔ lb, backup export and import, and the
+  local-data import.
+- Added: `e2e/a11y.spec.ts` runs axe (`@axe-core/playwright`) on `/login`, `/register` and the six
+  app pages with demo data, and fails on serious or critical violations.
+- Added: `e2e/global-setup.ts` builds `dist/`, starts the stack with secrets generated for the
+  run, waits for `/api/v1/health` and removes the stack and its volumes (`down -v`) afterwards.
+- Added: CI job `e2e` after `frontend` and `backend`; on failure it uploads `playwright-report/`
+  and `test-results/` (without `test-results/.auth/`) for 7 days.
+- Added: dev dependencies `@playwright/test` and `@axe-core/playwright`; `tsconfig.e2e.json` in
+  the `typecheck` build; ESLint ignores `playwright-report` and `test-results`.
+- Fixed: the Workouts Personal records table was not reachable by keyboard when it scrolled on
+  narrow screens (axe `scrollable-region-focusable`, serious). Its wrapper is now a focusable
+  region named `Personal records`.
+
 ## TF06 — UX states, accessibility, performance (2026-11-11)
 
 - Added: `QueryState` and `MutationFeedback` in `src/components/ui.tsx`. Every page shows

@@ -2,7 +2,9 @@
 
 ## Requirements
 
-Node.js 26 and npm for the frontend. The backend also needs Docker with Compose v2 for PostgreSQL.
+Node.js 26 and npm for the frontend. The backend and the end-to-end tests also need Docker with
+Compose v2. The end-to-end tests also need Playwright's Chromium (see
+[`testing.md`](./testing.md#prerequisites)).
 
 ## Install and run
 
@@ -13,17 +15,18 @@ npm run dev
 
 ## Scripts
 
-| Script                  | What it does                                                                                    |
-| ----------------------- | ----------------------------------------------------------------------------------------------- |
-| `npm run dev`           | Starts Vite; `/api` is proxied to `http://localhost:3000`, keeping the browser's `Host` header. |
-| `npm run build`         | Type-checks (`tsc -b`) and builds to `dist/`.                                                   |
-| `npm run preview`       | Serves the built `dist/` locally.                                                               |
-| `npm run lint`          | Runs ESLint on the repo (`eslint-config-prettier` turns off rules that conflict with Prettier). |
-| `npm run format`        | Formats every file with Prettier.                                                               |
-| `npm run format:check`  | Fails if any file is not Prettier-formatted.                                                    |
-| `npm run typecheck`     | Runs `tsc -b --noEmit` across the app, `shared/` and config.                                    |
-| `npm test`              | Runs the Vitest suite once.                                                                     |
-| `npm run test:coverage` | Runs Vitest with v8 coverage and enforces the thresholds.                                       |
+| Script                  | What it does                                                                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run dev`           | Starts Vite; `/api` is proxied to `http://localhost:3000`, keeping the browser's `Host` header.                                                  |
+| `npm run build`         | Type-checks (`tsc -b`) and builds to `dist/`.                                                                                                    |
+| `npm run preview`       | Serves the built `dist/` locally.                                                                                                                |
+| `npm run lint`          | Runs ESLint on the repo (`eslint-config-prettier` turns off rules that conflict with Prettier).                                                  |
+| `npm run format`        | Formats every file with Prettier.                                                                                                                |
+| `npm run format:check`  | Fails if any file is not Prettier-formatted.                                                                                                     |
+| `npm run typecheck`     | Runs `tsc -b --noEmit` across the app, `shared/`, config and `e2e/`.                                                                             |
+| `npm test`              | Runs the Vitest suite once.                                                                                                                      |
+| `npm run test:coverage` | Runs Vitest with v8 coverage and enforces the thresholds.                                                                                        |
+| `npm run test:e2e`      | Runs the Playwright suite against the production stack, which it builds, starts and removes (see [`testing.md`](./testing.md#end-to-end-tests)). |
 
 Prettier settings are in `.prettierrc.json`; ignored paths are in `.prettierignore`.
 
@@ -181,7 +184,7 @@ The backend reads these from the environment (`server/.env` in development; temp
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every push and pull request, on Node.js 26, with two jobs.
+`.github/workflows/ci.yml` runs on every push and pull request, on Node.js 26, with three jobs.
 
 The frontend job runs at the repo root:
 
@@ -208,6 +211,17 @@ npm run build
 npm audit --omit=dev --audit-level=high
 ```
 
+The `e2e` job starts after `frontend` and `backend` pass and runs at the repo root:
+
+```bash
+npm ci
+npx playwright install --with-deps chromium
+npm run test:e2e
+```
+
+It starts the production stack with secrets generated for the run and uploads the Playwright
+report when it fails (see [`testing.md`](./testing.md#ci)).
+
 The audit steps fail only on high or critical advisories in production dependencies.
 
-_Last updated by TF04._
+_Last updated by TF07._

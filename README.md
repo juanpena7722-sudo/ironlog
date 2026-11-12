@@ -17,9 +17,9 @@ version can be imported into the account once.
 
 ## Tech stack
 
-Frontend: Vite, React 19, TypeScript, React Router, Recharts and Zod. Backend (in progress):
-Fastify 5, Zod and PostgreSQL 16 (Docker Compose). Tooling: ESLint, Prettier, Vitest and GitHub
-Actions.
+Frontend: Vite, React 19, TypeScript, React Router, TanStack Query, Recharts and Zod. Backend:
+Fastify 5, Zod, Prisma and PostgreSQL 16. Gateway: Caddy 2, with the production stack in Docker
+Compose. Tooling: ESLint, Prettier, Vitest, Playwright with axe-core, and GitHub Actions.
 
 ## Getting started
 
@@ -36,27 +36,30 @@ The backend (`server/`) also needs Docker:
 docker compose up -d postgres
 npm --prefix server ci
 cp server/.env.example server/.env   # then set JWT_SECRET
+npm --prefix server run db:migrate
 npm --prefix server run dev
 ```
 
-See [`docs/setup.md`](./docs/setup.md) for env vars and server scripts.
+See [`docs/setup.md`](./docs/setup.md) for env vars, server scripts and the production stack.
 
 ## Scripts
 
-| Script                  | What it does                                |
-| ----------------------- | ------------------------------------------- |
-| `npm run dev`           | Start the dev server                        |
-| `npm run build`         | Type-check and build to `dist/`             |
-| `npm run preview`       | Serve the built app                         |
-| `npm run lint`          | ESLint                                      |
-| `npm run format`        | Format all files with Prettier              |
-| `npm run format:check`  | Verify formatting                           |
-| `npm run typecheck`     | TypeScript check, including `shared/`       |
-| `npm test`              | Run unit tests                              |
-| `npm run test:coverage` | Run tests with coverage thresholds enforced |
+| Script                  | What it does                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------- |
+| `npm run dev`           | Start the dev server                                                                              |
+| `npm run build`         | Type-check and build to `dist/`                                                                   |
+| `npm run preview`       | Serve the built app                                                                               |
+| `npm run lint`          | ESLint                                                                                            |
+| `npm run format`        | Format all files with Prettier                                                                    |
+| `npm run format:check`  | Verify formatting                                                                                 |
+| `npm run typecheck`     | TypeScript check, including `shared/`                                                             |
+| `npm test`              | Run unit tests                                                                                    |
+| `npm run test:coverage` | Run tests with coverage thresholds enforced                                                       |
+| `npm run test:e2e`      | Run the Playwright end-to-end and accessibility suite against the production stack (needs Docker) |
 
 CI (`.github/workflows/ci.yml`) runs lint, format check, typecheck, coverage, build and
-`npm audit` on every push and pull request, with a separate job for `server/`.
+`npm audit` on every push and pull request, with a separate job for `server/` and an `e2e` job
+that runs `npm run test:e2e`.
 
 ## Project structure
 
@@ -64,11 +67,14 @@ CI (`.github/workflows/ci.yml`) runs lint, format check, typecheck, coverage, bu
 src/        React app (pages, components, store, utils)
 shared/     Zod schemas and the data types inferred from them (@shared/* alias)
 server/     Fastify API (separate npm package)
+e2e/        Playwright end-to-end and accessibility tests
+deploy/     Gateway (Caddy) config
 docs/       Project documentation
 ```
 
 ## Documentation
 
-- [`docs/`](./docs/README.md): setup, backend, API, testing, changelog and task records
+- [`docs/`](./docs/README.md): architecture, setup, frontend, backend, API, testing, changelog and
+  task records
 - [`PRODUCTION_RULES.md`](./PRODUCTION_RULES.md): development, testing, security and release rules
 - [`TASKS.md`](./TASKS.md): frontend (`TF`) and backend (`TB`) task backlog
