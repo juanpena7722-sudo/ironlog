@@ -5,7 +5,7 @@ import type { BodyEntry } from '../types'
 import { GOALS } from '../test/handlers'
 import { mockCollection, mockGoals } from '../test/mockApi'
 import { renderApp, renderWithProviders } from '../test/render'
-import { today } from '../utils'
+import { fmtDate, today } from '../utils'
 import Progress from './Progress'
 
 const CHECK_IN: BodyEntry = {
@@ -32,7 +32,7 @@ describe('Progress', () => {
     renderWithProviders(<Progress />)
     const user = userEvent.setup()
 
-    await user.type(screen.getByLabelText('Weight (kg) *'), '80.4')
+    await user.type(await screen.findByLabelText('Weight (kg) *'), '80.4')
     await user.type(screen.getByLabelText('Waist (cm)'), '79')
     await user.click(screen.getByRole('button', { name: 'Save check-in' }))
 
@@ -67,9 +67,12 @@ describe('Progress', () => {
     const api = mockCollection('body', [CHECK_IN])
     renderWithProviders(<Progress />)
 
-    await userEvent.setup().click(await screen.findByRole('button', { name: '✕' }))
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: `Delete ${fmtDate(CHECK_IN.date)}` }))
 
     expect(await screen.findByText('No check-ins yet.')).toBeDefined()
+    expect(screen.getByRole('status').textContent).toBe('Check-in deleted.')
     expect(api.requests.find((r) => r.method === 'DELETE')?.url.pathname).toBe(
       `/api/v1/body/${CHECK_IN.id}`,
     )

@@ -86,6 +86,7 @@ describe('Workouts', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
     expect(await screen.findByText('No workouts yet. Hit “Log workout” to start.')).toBeDefined()
+    expect(screen.getByRole('status').textContent).toBe('Workout deleted.')
     expect(api.requests.find((r) => r.method === 'DELETE')?.url.pathname).toBe(
       `/api/v1/workouts/${PUSH.id}`,
     )

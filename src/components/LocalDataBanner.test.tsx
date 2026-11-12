@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_GOALS } from '../store'
-import { GOALS } from '../test/handlers'
+import { GOALS, USER } from '../test/handlers'
 import { renderApp } from '../test/render'
 import { server } from '../test/setup'
 
@@ -68,10 +68,15 @@ describe('local data banner', () => {
 
   it('merges the local data in its stored unit, then clears it and refreshes', async () => {
     let goalsRequests = 0
+    let sessionRequests = 0
     server.use(
       http.get('/api/v1/goals', () => {
         goalsRequests += 1
         return HttpResponse.json(GOALS)
+      }),
+      http.get('/api/v1/auth/me', () => {
+        sessionRequests += 1
+        return HttpResponse.json(USER)
       }),
     )
     const imports = mockImport(() => HttpResponse.json({ imported: {}, skipped: {} }))
@@ -82,6 +87,7 @@ describe('local data banner', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Import local data' }))
 
     await waitFor(() => expect(screen.queryByRole('region', { name: BANNER })).toBeNull())
+    expect(screen.getByText('Local data imported.').getAttribute('role')).toBe('status')
     expect(imports).toEqual([
       {
         search: '?mode=merge&unitHint=lb',
@@ -97,6 +103,7 @@ describe('local data banner', () => {
     ])
     expect(localStorage.getItem(LOCAL_DATA_KEY)).toBeNull()
     await waitFor(() => expect(goalsRequests).toBe(2))
+    expect(sessionRequests).toBe(1)
   })
 
   it('keeps the local data and shows the error when the import fails', async () => {

@@ -335,6 +335,18 @@ describe('rate limit', () => {
     }
     expectProblem(await login('nobody@example.com'), 429)
   })
+
+  it('does not apply the auth limit to /auth/me and logout, while login is still limited', async () => {
+    const { value } = await registerSession()
+    for (let attempt = 0; attempt < 15; attempt++) {
+      expect((await me(value)).statusCode).toBe(200)
+      expect((await send({ method: 'POST', url: '/api/v1/auth/logout' })).statusCode).toBe(204)
+    }
+    for (let attempt = 0; attempt < 10; attempt++) {
+      expect((await login('nobody@example.com')).statusCode).toBe(401)
+    }
+    expectProblem(await login('nobody@example.com'), 429)
+  })
 })
 
 describe('password hash', () => {

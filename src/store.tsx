@@ -7,6 +7,7 @@ import {
   HealthEntrySchema,
   WorkoutSchema,
 } from '@shared/schemas'
+import { SESSION_KEY } from './api/auth'
 import { apiRequest, jsonRequest } from './api/client'
 import type { AppData, BodyEntry, FoodEntry, Goals, HealthEntry, ISODate, Workout } from './types'
 
@@ -132,6 +133,8 @@ export function useImportData() {
         z.unknown(),
         jsonRequest('POST', data),
       ),
-    onSuccess: () => queryClient.invalidateQueries(),
+    // An import does not change the session, so it is not fetched again.
+    onSuccess: () =>
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== SESSION_KEY[0] }),
   })
 }

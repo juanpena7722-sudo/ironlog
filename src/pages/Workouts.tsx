@@ -3,7 +3,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { DEFAULT_GOALS, useDeleteWorkout, useGoals, useSaveWorkout, useWorkouts } from '../store'
 import { MUSCLES } from '../types'
 import type { ExerciseEntry, Workout } from '../types'
-import { Card, Empty, PageHead, chart } from '../components/ui'
+import { Card, Empty, MutationFeedback, PageHead, QueryState, chart } from '../components/ui'
 import {
   byDateDesc,
   e1rm,
@@ -45,8 +45,10 @@ const blankWorkout = (): Workout => ({
 })
 
 export default function Workouts() {
-  const allWorkouts = useWorkouts().data ?? NO_WORKOUTS
-  const { unit } = useGoals().data ?? DEFAULT_GOALS
+  const workoutsQuery = useWorkouts()
+  const goalsQuery = useGoals()
+  const allWorkouts = workoutsQuery.data ?? NO_WORKOUTS
+  const { unit } = goalsQuery.data ?? DEFAULT_GOALS
   const saveWorkout = useSaveWorkout()
   const deleteWorkout = useDeleteWorkout()
   const display = (kg: number) => toDisplayWeight(kg, unit)
@@ -155,310 +157,327 @@ export default function Workouts() {
   return (
     <>
       <PageHead title="Workouts" sub="Log sessions, track your lifts and personal records." />
-
-      {draft ? (
-        <Card title={isEditing ? 'Edit workout' : 'New workout'}>
-          <div className="form-grid">
-            <label>
-              Name
-              <input
-                value={draft.name}
-                placeholder="Push day, Legs…"
-                onChange={(e) => patch((w) => ({ ...w, name: e.target.value }))}
-              />
-            </label>
-            <label>
-              Date
-              <input
-                type="date"
-                value={draft.date}
-                onChange={(e) => patch((w) => ({ ...w, date: e.target.value }))}
-              />
-            </label>
-            <label>
-              Duration (min)
-              <input
-                type="number"
-                min={0}
-                value={draft.durationMin ?? ''}
-                onChange={(e) => patch((w) => ({ ...w, durationMin: num(e.target.value) }))}
-              />
-            </label>
-          </div>
-
-          <datalist id="exercise-names">
-            {exerciseNames.map((n) => (
-              <option key={n} value={n} />
-            ))}
-          </datalist>
-
-          {draft.exercises.map((ex, i) => (
-            <div key={ex.id} className="exercise">
-              <div className="exercise-head">
-                <span className="badge">{i + 1}</span>
+      <MutationFeedback
+        mutations={[
+          [saveWorkout, 'Workout saved.'],
+          [deleteWorkout, 'Workout deleted.'],
+        ]}
+      />
+      <QueryState queries={[workoutsQuery, goalsQuery]}>
+        {draft ? (
+          <Card title={isEditing ? 'Edit workout' : 'New workout'}>
+            <div className="form-grid">
+              <label>
+                Name
                 <input
-                  list="exercise-names"
-                  placeholder="Exercise (e.g. Bench Press)"
-                  value={ex.name}
-                  onChange={(e) => {
-                    const name = e.target.value
-                    const known = lastMuscleFor.get(name.toLowerCase())
-                    patchEx(ex.id, (x) => ({ ...x, name, muscle: known ?? x.muscle }))
-                  }}
+                  value={draft.name}
+                  placeholder="Push day, Legs…"
+                  onChange={(e) => patch((w) => ({ ...w, name: e.target.value }))}
                 />
-                <select
-                  value={ex.muscle}
-                  onChange={(e) => patchEx(ex.id, (x) => ({ ...x, muscle: e.target.value }))}
-                >
-                  {MUSCLES.map((m) => (
-                    <option key={m}>{m}</option>
-                  ))}
-                </select>
+              </label>
+              <label>
+                Date
+                <input
+                  type="date"
+                  value={draft.date}
+                  onChange={(e) => patch((w) => ({ ...w, date: e.target.value }))}
+                />
+              </label>
+              <label>
+                Duration (min)
+                <input
+                  type="number"
+                  min={0}
+                  value={draft.durationMin ?? ''}
+                  onChange={(e) => patch((w) => ({ ...w, durationMin: num(e.target.value) }))}
+                />
+              </label>
+            </div>
+
+            <datalist id="exercise-names">
+              {exerciseNames.map((n) => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+
+            {draft.exercises.map((ex, i) => (
+              <div key={ex.id} className="exercise">
+                <div className="exercise-head">
+                  <span className="badge">{i + 1}</span>
+                  <input
+                    list="exercise-names"
+                    aria-label={`Exercise ${i + 1} name`}
+                    placeholder="Exercise (e.g. Bench Press)"
+                    value={ex.name}
+                    onChange={(e) => {
+                      const name = e.target.value
+                      const known = lastMuscleFor.get(name.toLowerCase())
+                      patchEx(ex.id, (x) => ({ ...x, name, muscle: known ?? x.muscle }))
+                    }}
+                  />
+                  <select
+                    aria-label={`Exercise ${i + 1} muscle`}
+                    value={ex.muscle}
+                    onChange={(e) => patchEx(ex.id, (x) => ({ ...x, muscle: e.target.value }))}
+                  >
+                    {MUSCLES.map((m) => (
+                      <option key={m}>{m}</option>
+                    ))}
+                  </select>
+                  <button
+                    className="ghost danger"
+                    title="Remove exercise"
+                    aria-label={`Remove exercise ${i + 1}`}
+                    onClick={() =>
+                      patch((w) => ({ ...w, exercises: w.exercises.filter((e) => e.id !== ex.id) }))
+                    }
+                  >
+                    ✕
+                  </button>
+                </div>
+                <table className="sets">
+                  <thead>
+                    <tr>
+                      <th>Set</th>
+                      <th>Weight ({unit})</th>
+                      <th>Reps</th>
+                      <th>e1RM</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ex.sets.map((s, si) => (
+                      <tr key={si}>
+                        <td>{si + 1}</td>
+                        <td>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            aria-label={`Set ${si + 1} weight (${unit})`}
+                            value={s.weight}
+                            onChange={(e) =>
+                              patchEx(ex.id, (x) => ({
+                                ...x,
+                                sets: x.sets.map((y, yi) =>
+                                  yi === si ? { ...y, weight: num(e.target.value) ?? 0 } : y,
+                                ),
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min={0}
+                            aria-label={`Set ${si + 1} reps`}
+                            value={s.reps}
+                            onChange={(e) =>
+                              patchEx(ex.id, (x) => ({
+                                ...x,
+                                sets: x.sets.map((y, yi) =>
+                                  yi === si ? { ...y, reps: num(e.target.value) ?? 0 } : y,
+                                ),
+                              }))
+                            }
+                          />
+                        </td>
+                        <td className="muted">{round(e1rm(s.weight, s.reps))}</td>
+                        <td>
+                          <button
+                            className="ghost danger"
+                            title="Remove set"
+                            aria-label={`Remove set ${si + 1}`}
+                            onClick={() =>
+                              patchEx(ex.id, (x) => ({
+                                ...x,
+                                sets: x.sets.filter((_, yi) => yi !== si),
+                              }))
+                            }
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
                 <button
-                  className="ghost danger"
-                  title="Remove exercise"
+                  className="ghost small"
                   onClick={() =>
-                    patch((w) => ({ ...w, exercises: w.exercises.filter((e) => e.id !== ex.id) }))
+                    patchEx(ex.id, (x) => ({
+                      ...x,
+                      sets: [...x.sets, { ...(x.sets.at(-1) ?? { reps: 8, weight: 0 }) }],
+                    }))
                   }
                 >
-                  ✕
+                  + Add set
                 </button>
               </div>
-              <table className="sets">
-                <thead>
-                  <tr>
-                    <th>Set</th>
-                    <th>Weight ({unit})</th>
-                    <th>Reps</th>
-                    <th>e1RM</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {ex.sets.map((s, si) => (
-                    <tr key={si}>
-                      <td>{si + 1}</td>
-                      <td>
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.5}
-                          value={s.weight}
-                          onChange={(e) =>
-                            patchEx(ex.id, (x) => ({
-                              ...x,
-                              sets: x.sets.map((y, yi) =>
-                                yi === si ? { ...y, weight: num(e.target.value) ?? 0 } : y,
-                              ),
-                            }))
-                          }
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          min={0}
-                          value={s.reps}
-                          onChange={(e) =>
-                            patchEx(ex.id, (x) => ({
-                              ...x,
-                              sets: x.sets.map((y, yi) =>
-                                yi === si ? { ...y, reps: num(e.target.value) ?? 0 } : y,
-                              ),
-                            }))
-                          }
-                        />
-                      </td>
-                      <td className="muted">{round(e1rm(s.weight, s.reps))}</td>
-                      <td>
-                        <button
-                          className="ghost danger"
-                          title="Remove set"
-                          onClick={() =>
-                            patchEx(ex.id, (x) => ({
-                              ...x,
-                              sets: x.sets.filter((_, yi) => yi !== si),
-                            }))
-                          }
-                        >
-                          ✕
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <button
-                className="ghost small"
-                onClick={() =>
-                  patchEx(ex.id, (x) => ({
-                    ...x,
-                    sets: [...x.sets, { ...(x.sets.at(-1) ?? { reps: 8, weight: 0 }) }],
-                  }))
-                }
-              >
-                + Add set
+            ))}
+
+            <button
+              className="ghost"
+              onClick={() => patch((w) => ({ ...w, exercises: [...w.exercises, newExercise()] }))}
+            >
+              + Add exercise
+            </button>
+
+            <label className="block">
+              Notes
+              <textarea
+                rows={2}
+                value={draft.notes ?? ''}
+                placeholder="How did it feel? Pump, fatigue, form cues…"
+                onChange={(e) => patch((w) => ({ ...w, notes: e.target.value }))}
+              />
+            </label>
+
+            <div className="actions">
+              <button onClick={save}>Save workout</button>
+              <button className="ghost" onClick={() => setDraft(null)}>
+                Cancel
               </button>
             </div>
-          ))}
-
-          <button
-            className="ghost"
-            onClick={() => patch((w) => ({ ...w, exercises: [...w.exercises, newExercise()] }))}
-          >
-            + Add exercise
-          </button>
-
-          <label className="block">
-            Notes
-            <textarea
-              rows={2}
-              value={draft.notes ?? ''}
-              placeholder="How did it feel? Pump, fatigue, form cues…"
-              onChange={(e) => patch((w) => ({ ...w, notes: e.target.value }))}
-            />
-          </label>
-
-          <div className="actions">
-            <button onClick={save}>Save workout</button>
-            <button className="ghost" onClick={() => setDraft(null)}>
-              Cancel
-            </button>
-          </div>
-        </Card>
-      ) : (
-        <div className="actions">
-          <button onClick={() => setDraft(blankWorkout())}>+ Log workout</button>
-          {workouts[0] && (
-            <button className="ghost" onClick={() => startFrom(workouts[0])}>
-              Repeat “{workouts[0].name}”
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="grid-2">
-        <Card title="Weekly volume">
-          <div className="chart">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={weekly}>
-                <CartesianGrid stroke={chart.grid} vertical={false} />
-                <XAxis dataKey="label" tick={chart.axis} tickLine={false} axisLine={false} />
-                <YAxis tick={chart.axis} tickLine={false} axisLine={false} width={50} />
-                <Tooltip
-                  {...chart.tooltip}
-                  formatter={(v: number) => [`${Math.round(v).toLocaleString()} ${unit}`, 'Volume']}
-                />
-                <Bar dataKey="volume" fill={chart.primary} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        <Card title="Personal records (est. 1RM)">
-          {prs.length === 0 ? (
-            <Empty>Log a workout to see your PRs.</Empty>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Exercise</th>
-                    <th>Best set</th>
-                    <th>e1RM</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {prs.slice(0, 10).map((p) => (
-                    <tr key={p.name}>
-                      <td>{p.name}</td>
-                      <td>
-                        {display(p.weight)} × {p.reps}
-                      </td>
-                      <td>
-                        <strong>{display(p.e1rm)}</strong> {unit}
-                      </td>
-                      <td className="muted">{fmtDate(p.date)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      <Card title="History">
-        {workouts.length === 0 ? (
-          <Empty>No workouts yet. Hit “Log workout” to start.</Empty>
+          </Card>
         ) : (
-          <ul className="list">
-            {workouts.map((w) => (
-              <li key={w.id} className="list-item">
-                <button
-                  className="list-row"
-                  onClick={() => setOpenId(openId === w.id ? null : w.id)}
-                >
-                  <div>
-                    <strong>{w.name}</strong>
-                    <div className="muted small">
-                      {fmtLongDate(w.date)}
-                      {w.durationMin ? ` · ${w.durationMin} min` : ''}
-                    </div>
-                  </div>
-                  <div className="muted small right">
-                    {w.exercises.length} exercises ·{' '}
-                    {Math.round(display(workoutVolume(w))).toLocaleString()} {unit}
-                  </div>
-                </button>
-                {openId === w.id && (
-                  <div className="list-detail">
-                    {w.exercises.map((e) => (
-                      <div key={e.id} className="detail-line">
-                        <span>
-                          {e.name} <span className="tag">{e.muscle}</span>
-                        </span>
-                        <span className="muted">
-                          {e.sets.map((s) => `${display(s.weight)}×${s.reps}`).join(', ')} ·{' '}
-                          {Math.round(display(exerciseVolume(e)))} {unit}
-                        </span>
-                      </div>
-                    ))}
-                    {w.notes && <p className="muted">{w.notes}</p>}
-                    <div className="actions">
-                      <button
-                        className="ghost small"
-                        onClick={() => {
-                          edit(w)
-                          window.scrollTo({ top: 0 })
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="ghost small"
-                        onClick={() => {
-                          startFrom(w)
-                          window.scrollTo({ top: 0 })
-                        }}
-                      >
-                        Use as template
-                      </button>
-                      <button
-                        className="ghost small danger"
-                        onClick={() => deleteWorkout.mutate(w.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className="actions">
+            <button onClick={() => setDraft(blankWorkout())}>+ Log workout</button>
+            {workouts[0] && (
+              <button className="ghost" onClick={() => startFrom(workouts[0])}>
+                Repeat “{workouts[0].name}”
+              </button>
+            )}
+          </div>
         )}
-      </Card>
+
+        <div className="grid-2">
+          <Card title="Weekly volume">
+            <div className="chart">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={weekly}>
+                  <CartesianGrid stroke={chart.grid} vertical={false} />
+                  <XAxis dataKey="label" tick={chart.axis} tickLine={false} axisLine={false} />
+                  <YAxis tick={chart.axis} tickLine={false} axisLine={false} width={50} />
+                  <Tooltip
+                    {...chart.tooltip}
+                    formatter={(v: number) => [
+                      `${Math.round(v).toLocaleString()} ${unit}`,
+                      'Volume',
+                    ]}
+                  />
+                  <Bar dataKey="volume" fill={chart.primary} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Personal records (est. 1RM)">
+            {prs.length === 0 ? (
+              <Empty>Log a workout to see your PRs.</Empty>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Exercise</th>
+                      <th>Best set</th>
+                      <th>e1RM</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prs.slice(0, 10).map((p) => (
+                      <tr key={p.name}>
+                        <td>{p.name}</td>
+                        <td>
+                          {display(p.weight)} × {p.reps}
+                        </td>
+                        <td>
+                          <strong>{display(p.e1rm)}</strong> {unit}
+                        </td>
+                        <td className="muted">{fmtDate(p.date)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        <Card title="History">
+          {workouts.length === 0 ? (
+            <Empty>No workouts yet. Hit “Log workout” to start.</Empty>
+          ) : (
+            <ul className="list">
+              {workouts.map((w) => (
+                <li key={w.id} className="list-item">
+                  <button
+                    className="list-row"
+                    aria-expanded={openId === w.id}
+                    onClick={() => setOpenId(openId === w.id ? null : w.id)}
+                  >
+                    <div>
+                      <strong>{w.name}</strong>
+                      <div className="muted small">
+                        {fmtLongDate(w.date)}
+                        {w.durationMin ? ` · ${w.durationMin} min` : ''}
+                      </div>
+                    </div>
+                    <div className="muted small right">
+                      {w.exercises.length} exercises ·{' '}
+                      {Math.round(display(workoutVolume(w))).toLocaleString()} {unit}
+                    </div>
+                  </button>
+                  {openId === w.id && (
+                    <div className="list-detail">
+                      {w.exercises.map((e) => (
+                        <div key={e.id} className="detail-line">
+                          <span>
+                            {e.name} <span className="tag">{e.muscle}</span>
+                          </span>
+                          <span className="muted">
+                            {e.sets.map((s) => `${display(s.weight)}×${s.reps}`).join(', ')} ·{' '}
+                            {Math.round(display(exerciseVolume(e)))} {unit}
+                          </span>
+                        </div>
+                      ))}
+                      {w.notes && <p className="muted">{w.notes}</p>}
+                      <div className="actions">
+                        <button
+                          className="ghost small"
+                          onClick={() => {
+                            edit(w)
+                            window.scrollTo({ top: 0 })
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="ghost small"
+                          onClick={() => {
+                            startFrom(w)
+                            window.scrollTo({ top: 0 })
+                          }}
+                        >
+                          Use as template
+                        </button>
+                        <button
+                          className="ghost small danger"
+                          onClick={() => deleteWorkout.mutate(w.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </QueryState>
     </>
   )
 }

@@ -1,6 +1,5 @@
-import { useMemo } from 'react'
+import { Suspense, lazy, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
   DEFAULT_GOALS,
   useBody,
@@ -11,7 +10,7 @@ import {
   useWorkouts,
 } from '../store'
 import type { BodyEntry, FoodEntry, HealthEntry, Workout } from '../types'
-import { Card, Empty, Meter, PageHead, Stat, chart } from '../components/ui'
+import { Card, Empty, Meter, PageHead, QueryState, Stat } from '../components/ui'
 import {
   byDateAsc,
   byDateDesc,
@@ -30,14 +29,28 @@ const NO_FOODS: FoodEntry[] = []
 const NO_BODY: BodyEntry[] = []
 const NO_HEALTH: HealthEntry[] = []
 
+// Recharts is large, so it stays out of the first load.
+const WeightTrendChart = lazy(() => import('../components/WeightTrendChart'))
+const LOADING_CHART = (
+  <p role="status" className="muted">
+    Loading chart…
+  </p>
+)
+
 export default function Dashboard() {
   const t = today()
-  const g = useGoals().data ?? DEFAULT_GOALS
-  const workouts = useWorkouts().data ?? NO_WORKOUTS
-  const foods = useFoods({ from: t, to: t }).data ?? NO_FOODS
-  const hasFoods = Boolean(useRecentFoods().data?.length)
-  const bodyEntries = useBody().data ?? NO_BODY
-  const healthEntries = useHealth().data ?? NO_HEALTH
+  const goalsQuery = useGoals()
+  const workoutsQuery = useWorkouts()
+  const foodsQuery = useFoods({ from: t, to: t })
+  const recentQuery = useRecentFoods()
+  const bodyQuery = useBody()
+  const healthQuery = useHealth()
+  const g = goalsQuery.data ?? DEFAULT_GOALS
+  const workouts = workoutsQuery.data ?? NO_WORKOUTS
+  const foods = foodsQuery.data ?? NO_FOODS
+  const hasFoods = Boolean(recentQuery.data?.length)
+  const bodyEntries = bodyQuery.data ?? NO_BODY
+  const healthEntries = healthQuery.data ?? NO_HEALTH
   const weight = (kg: number) => toDisplayWeight(kg, g.unit)
 
   const food = totals(foods)
@@ -69,153 +82,129 @@ export default function Dashboard() {
   return (
     <>
       <PageHead title="Dashboard" sub={fmtLongDate(t)} />
+      <QueryState
+        queries={[goalsQuery, workoutsQuery, foodsQuery, recentQuery, bodyQuery, healthQuery]}
+      >
+        {isEmpty && (
+          <Card className="welcome">
+            <h2>Welcome to IronLog 🏋️</h2>
+            <p className="muted">
+              Start by setting your targets in <Link to="/settings">Settings</Link>, then log a{' '}
+              <Link to="/workouts">workout</Link>, your <Link to="/diet">meals</Link>, a{' '}
+              <Link to="/progress">weigh-in</Link> and your <Link to="/health">sleep</Link>. Want to
+              look around first? Load demo data from Settings.
+            </p>
+          </Card>
+        )}
 
-      {isEmpty && (
-        <Card className="welcome">
-          <h2>Welcome to IronLog 🏋️</h2>
-          <p className="muted">
-            Start by setting your targets in <Link to="/settings">Settings</Link>, then log a{' '}
-            <Link to="/workouts">workout</Link>, your <Link to="/diet">meals</Link>, a{' '}
-            <Link to="/progress">weigh-in</Link> and your <Link to="/health">sleep</Link>. Want to
-            look around first? Load demo data from Settings.
-          </p>
-        </Card>
-      )}
+        <div className="stats">
+          <Stat
+            label="Bodyweight"
+            value={latest ? `${weight(latest.weight)} ${g.unit}` : '—'}
+            sub={
+              weightDelta !== undefined
+                ? `${weightDelta > 0 ? '+' : ''}${weightDelta} ${g.unit} this week`
+                : 'Log a weigh-in'
+            }
+          />
+          <Stat
+            label="Sessions this week"
+            value={thisWeek.length}
+            sub={`${Math.round(weight(weekVolume)).toLocaleString()} ${g.unit} volume`}
+          />
+          <Stat
+            label="Calories today"
+            value={Math.round(food.calories)}
+            sub={`of ${g.calories} kcal`}
+          />
+          <Stat
+            label="Sleep last night"
+            value={health?.sleepHours !== undefined ? `${health.sleepHours} h` : '—'}
+            sub={`Goal ${g.sleepHours} h`}
+          />
+        </div>
 
-      <div className="stats">
-        <Stat
-          label="Bodyweight"
-          value={latest ? `${weight(latest.weight)} ${g.unit}` : '—'}
-          sub={
-            weightDelta !== undefined
-              ? `${weightDelta > 0 ? '+' : ''}${weightDelta} ${g.unit} this week`
-              : 'Log a weigh-in'
-          }
-        />
-        <Stat
-          label="Sessions this week"
-          value={thisWeek.length}
-          sub={`${Math.round(weight(weekVolume)).toLocaleString()} ${g.unit} volume`}
-        />
-        <Stat
-          label="Calories today"
-          value={Math.round(food.calories)}
-          sub={`of ${g.calories} kcal`}
-        />
-        <Stat
-          label="Sleep last night"
-          value={health?.sleepHours !== undefined ? `${health.sleepHours} h` : '—'}
-          sub={`Goal ${g.sleepHours} h`}
-        />
-      </div>
+        <div className="grid-2">
+          <Card
+            title="Today's nutrition"
+            action={
+              <Link to="/diet" className="small">
+                Log food →
+              </Link>
+            }
+          >
+            <Meter label="Calories" value={food.calories} goal={g.calories} unit=" kcal" />
+            <Meter label="Protein" value={food.protein} goal={g.protein} unit=" g" />
+            <Meter label="Carbs" value={food.carbs} goal={g.carbs} unit=" g" />
+            <Meter label="Fat" value={food.fat} goal={g.fat} unit=" g" />
+            <Meter label="Water" value={health?.waterL ?? 0} goal={g.waterL} unit=" L" />
+          </Card>
 
-      <div className="grid-2">
-        <Card
-          title="Today's nutrition"
-          action={
-            <Link to="/diet" className="small">
-              Log food →
-            </Link>
-          }
-        >
-          <Meter label="Calories" value={food.calories} goal={g.calories} unit=" kcal" />
-          <Meter label="Protein" value={food.protein} goal={g.protein} unit=" g" />
-          <Meter label="Carbs" value={food.carbs} goal={g.carbs} unit=" g" />
-          <Meter label="Fat" value={food.fat} goal={g.fat} unit=" g" />
-          <Meter label="Water" value={health?.waterL ?? 0} goal={g.waterL} unit=" L" />
-        </Card>
+          <Card
+            title="Bodyweight (60 days)"
+            action={
+              <Link to="/progress" className="small">
+                Check in →
+              </Link>
+            }
+          >
+            {weightSeries.length < 2 ? (
+              <Empty>Log a few weigh-ins to see your trend.</Empty>
+            ) : (
+              <Suspense fallback={LOADING_CHART}>
+                <WeightTrendChart data={weightSeries} />
+              </Suspense>
+            )}
+          </Card>
 
-        <Card
-          title="Bodyweight (60 days)"
-          action={
-            <Link to="/progress" className="small">
-              Check in →
-            </Link>
-          }
-        >
-          {weightSeries.length < 2 ? (
-            <Empty>Log a few weigh-ins to see your trend.</Empty>
-          ) : (
-            <div className="chart">
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={weightSeries}>
-                  <defs>
-                    <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={chart.primary} stopOpacity={0.35} />
-                      <stop offset="100%" stopColor={chart.primary} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="label"
-                    tick={chart.axis}
-                    tickLine={false}
-                    axisLine={false}
-                    minTickGap={24}
-                  />
-                  <YAxis
-                    tick={chart.axis}
-                    tickLine={false}
-                    axisLine={false}
-                    width={40}
-                    domain={['auto', 'auto']}
-                  />
-                  <Tooltip {...chart.tooltip} />
-                  <Area
-                    type="monotone"
-                    dataKey="weight"
-                    stroke={chart.primary}
-                    strokeWidth={2}
-                    fill="url(#wg)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </Card>
-
-        <Card title="Muscles trained this week" action={<span className="muted small">sets</span>}>
-          {muscleSets.length === 0 ? (
-            <Empty>No training logged this week yet.</Empty>
-          ) : (
-            muscleSets.map(([m, n]) => (
-              <div key={m} className="hbar">
-                <span>{m}</span>
-                <div className="meter-track">
-                  <div className="meter-fill" style={{ width: `${(n / maxSets) * 100}%` }} />
+          <Card
+            title="Muscles trained this week"
+            action={<span className="muted small">sets</span>}
+          >
+            {muscleSets.length === 0 ? (
+              <Empty>No training logged this week yet.</Empty>
+            ) : (
+              muscleSets.map(([m, n]) => (
+                <div key={m} className="hbar">
+                  <span>{m}</span>
+                  <div className="meter-track">
+                    <div className="meter-fill" style={{ width: `${(n / maxSets) * 100}%` }} />
+                  </div>
+                  <span className="muted">{n}</span>
                 </div>
-                <span className="muted">{n}</span>
-              </div>
-            ))
-          )}
-        </Card>
+              ))
+            )}
+          </Card>
 
-        <Card
-          title="Recent workouts"
-          action={
-            <Link to="/workouts" className="small">
-              All →
-            </Link>
-          }
-        >
-          {recentWorkouts.length === 0 ? (
-            <Empty>No workouts logged yet.</Empty>
-          ) : (
-            <ul className="list">
-              {recentWorkouts.map((w) => (
-                <li key={w.id} className="detail-line">
-                  <span>
-                    <strong>{w.name}</strong> <span className="muted small">{fmtDate(w.date)}</span>
-                  </span>
-                  <span className="muted small">
-                    {w.exercises.length} ex ·{' '}
-                    {Math.round(weight(workoutVolume(w))).toLocaleString()} {g.unit}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
+          <Card
+            title="Recent workouts"
+            action={
+              <Link to="/workouts" className="small">
+                All →
+              </Link>
+            }
+          >
+            {recentWorkouts.length === 0 ? (
+              <Empty>No workouts logged yet.</Empty>
+            ) : (
+              <ul className="list">
+                {recentWorkouts.map((w) => (
+                  <li key={w.id} className="detail-line">
+                    <span>
+                      <strong>{w.name}</strong>{' '}
+                      <span className="muted small">{fmtDate(w.date)}</span>
+                    </span>
+                    <span className="muted small">
+                      {w.exercises.length} ex ·{' '}
+                      {Math.round(weight(workoutVolume(w))).toLocaleString()} {g.unit}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </QueryState>
     </>
   )
 }

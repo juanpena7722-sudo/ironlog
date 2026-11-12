@@ -16,7 +16,7 @@ import {
   useWorkouts,
 } from '../store'
 import type { AppData, Goals } from '../types'
-import { Card, Field, PageHead } from '../components/ui'
+import { Card, Field, PageHead, QueryState } from '../components/ui'
 import { makeDemoData } from '../demo'
 import { byDateAsc, round } from '../utils'
 import { fromDisplayWeight, toDisplayWeight } from '../units'
@@ -31,11 +31,16 @@ const CONFIRM_TEXT = {
 }
 
 export default function Settings() {
-  const saved = useGoals().data
-  const workouts = useWorkouts().data ?? []
-  const foods = useFoods().data ?? []
-  const body = useBody().data ?? []
-  const health = useHealth().data ?? []
+  const goalsQuery = useGoals()
+  const workoutsQuery = useWorkouts()
+  const foodsQuery = useFoods()
+  const bodyQuery = useBody()
+  const healthQuery = useHealth()
+  const saved = goalsQuery.data
+  const workouts = workoutsQuery.data ?? []
+  const foods = foodsQuery.data ?? []
+  const body = bodyQuery.data ?? []
+  const health = healthQuery.data ?? []
   const saveGoals = useSaveGoals()
   const importData = useImportData()
   // targetWeight is in the display unit here. Until edited, the form shows the saved goals.
@@ -45,7 +50,7 @@ export default function Settings() {
     ...current,
     targetWeight: toDisplayWeight(current.targetWeight, current.unit),
   }
-  const [msg, setMsg] = useState('')
+  const [msg, setMsg] = useState({ text: '', isError: false })
   const [pending, setPending] = useState<Pending>(null)
   const [exportText, setExportText] = useState('')
   const [importMode, setImportMode] = useState<ImportMode>('merge')
@@ -57,10 +62,11 @@ export default function Settings() {
   const [passwordError, setPasswordError] = useState<string>()
 
   const latestWeight = [...body].sort(byDateAsc).at(-1)?.weight
-  const flash = (m: string) => {
-    setMsg(m)
-    setTimeout(() => setMsg(''), 3000)
+  const flash = (text: string, isError = false) => {
+    setMsg({ text, isError })
+    setTimeout(() => setMsg({ text: '', isError: false }), 3000)
   }
+  const flashError = (error: Error) => flash(errorMessage(error), true)
 
   const field = (k: keyof Goals) => ({
     value: goals[k] as number,
@@ -77,6 +83,7 @@ export default function Settings() {
           setLocal(null)
           flash('Targets saved.')
         },
+        onError: flashError,
       },
     )
   }
@@ -109,10 +116,7 @@ export default function Settings() {
     }
   }
 
-  const doExport = () =>
-    apiRequest('/backup', AppDataSchema).then(download, (error: Error) =>
-      flash(errorMessage(error)),
-    )
+  const doExport = () => apiRequest('/backup', AppDataSchema).then(download, flashError)
 
   const sendImport = (data: AppData, mode: ImportMode, unitHint: Goals['unit']) =>
     importData.mutate(
@@ -122,7 +126,7 @@ export default function Settings() {
           setLocal(null)
           flash('Data imported.')
         },
-        onError: (error) => flash(errorMessage(error)),
+        onError: flashError,
       },
     )
 
@@ -137,7 +141,7 @@ export default function Settings() {
       data = normalize(parsed)
       unitHint = unitHintFor(parsed)
     } catch {
-      flash('That file is not a valid IronLog backup.')
+      flash('That file is not a valid IronLog backup.', true)
       return
     }
     if (importMode === 'merge') {
@@ -161,7 +165,7 @@ export default function Settings() {
           data: { version: 1, workouts: [], foods: [], body: [], health: [], goals: saved },
           mode: 'replace',
         },
-        { onSuccess: () => flash('All logs cleared.') },
+        { onSuccess: () => flash('All logs cleared.'), onError: flashError },
       )
     } else if (pending === 'demo') {
       importData.mutate(
@@ -171,6 +175,7 @@ export default function Settings() {
             setLocal(null)
             flash('Demo data loaded.')
           },
+          onError: flashError,
         },
       )
     } else if (pending === 'import' && replacement) {
@@ -203,10 +208,18 @@ export default function Settings() {
   return (
     <>
       <PageHead title="Settings" sub="Targets, units and your data." />
-      {msg && <div className="toast">{msg}</div>}
+      <p role="status" className="toast">
+        {msg.isError ? '' : msg.text}
+      </p>
+      {msg.isError && (
+        <p role="alert" className="toast error">
+          {msg.text}
+        </p>
+      )}
 
       <div className="grid-2">
         <Card title="Targets">
+          <QueryState queries={[goalsQuery]} />
           <form onSubmit={save}>
             <div className="form-grid">
               <label>
@@ -271,10 +284,12 @@ export default function Settings() {
           <p className="muted small">
             Everything is stored in your account. Export a backup regularly.
           </p>
-          <p className="small">
-            {workouts.length} workouts · {foods.length} food entries · {body.length} check-ins ·{' '}
-            {health.length} health logs
-          </p>
+          <QueryState queries={[workoutsQuery, foodsQuery, bodyQuery, healthQuery]}>
+            <p className="small">
+              {workouts.length} workouts · {foods.length} food entries · {body.length} check-ins ·{' '}
+              {health.length} health logs
+            </p>
+          </QueryState>
           <div className="actions">
             <label>
               Import mode
@@ -328,6 +343,7 @@ export default function Settings() {
           {exportText && (
             <textarea
               className="export"
+              aria-label="Backup JSON"
               rows={6}
               readOnly
               value={exportText}

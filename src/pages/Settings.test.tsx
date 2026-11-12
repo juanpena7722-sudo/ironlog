@@ -223,6 +223,24 @@ describe('your data', () => {
     expect(body.body.length).toBeGreaterThan(0)
   })
 
+  it('shows the error when loading demo data fails', async () => {
+    server.use(
+      http.post('/api/v1/backup/import', () =>
+        HttpResponse.json(
+          { type: 'about:blank', title: 'Payload Too Large', status: 413, detail: 'Too large' },
+          { status: 413 },
+        ),
+      ),
+    )
+    renderWithProviders(<Settings />)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Load demo data' }))
+    await user.click(screen.getByRole('button', { name: 'Yes, continue' }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Too large')
+  })
+
   it.each([
     [
       'fails',

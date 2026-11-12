@@ -31,7 +31,7 @@ describe('Health', () => {
     renderWithProviders(<Health />)
     const user = userEvent.setup()
 
-    await user.type(screen.getByLabelText('Sleep (h)'), '8')
+    await user.type(await screen.findByLabelText('Sleep (h)'), '8')
     await user.type(screen.getByLabelText('Steps'), '9000')
     await user.selectOptions(screen.getByLabelText('Energy'), '🔥 Great')
     await user.click(screen.getByRole('button', { name: 'Save day' }))
@@ -66,9 +66,12 @@ describe('Health', () => {
     const api = mockCollection('health-entries', [TODAY], 'date')
     renderWithProviders(<Health />)
 
-    await userEvent.setup().click(await screen.findByRole('button', { name: '✕' }))
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: `Delete ${fmtDate(TODAY.date)}` }))
 
     expect(await screen.findByText('No health logs yet.')).toBeDefined()
+    expect(screen.getByRole('status').textContent).toBe('Day deleted.')
     expect(api.requests.find((r) => r.method === 'DELETE')?.url.pathname).toBe(
       `/api/v1/health-entries/${TODAY.date}`,
     )

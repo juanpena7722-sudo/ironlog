@@ -92,11 +92,11 @@ async function authRoutes(app: FastifyInstance) {
     return { id: user.id, email: user.email }
   })
 
-  app.post('/logout', RATE_LIMIT, async (_request, reply) =>
+  app.post('/logout', async (_request, reply) =>
     reply.clearCookie(SESSION_COOKIE, COOKIE_OPTIONS).status(204).send(),
   )
 
-  app.get('/me', { ...RATE_LIMIT, preHandler: app.requireAuth }, async (request) => {
+  app.get('/me', { preHandler: app.requireAuth }, async (request) => {
     const user = await app.db.user.findUnique({
       where: { id: request.userId },
       select: PUBLIC_USER,
