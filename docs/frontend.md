@@ -230,6 +230,9 @@ exercise with a name.` in `role="alert"`, and the first exercise name gets `aria
   `Set <n> reps`), the Diet `Date`, the Progress `Trend metric` select and the Settings `Backup
 JSON` textarea.
 - Workout history rows have `aria-expanded`.
+- The Workouts **Personal records** table scrolls sideways on narrow screens, so its
+  `.table-wrap` is a focusable region (`role="region"`, `aria-label="Personal records"`,
+  `tabIndex={0}`) that keyboard users can reach and scroll (axe `scrollable-region-focusable`).
 - Table columns that hold only buttons have a visually hidden `Actions` header. The `.sr-only`
   class in `src/index.css` hides content visually and keeps it for screen readers. It is
   `position: absolute`, so `.table-wrap` has `position: relative` to keep it inside the table's
@@ -240,6 +243,8 @@ JSON` textarea.
 - Colour tokens: `--danger` is `#f87171` (danger text on the dark background), and
   `--danger-strong` (`#dc2626`) is the background of solid danger buttons (`button.danger-solid`)
   under white text. Both meet WCAG AA contrast.
+- `e2e/a11y.spec.ts` runs axe on every page at desktop and 390 px widths and fails on any
+  serious or critical violation (see [`testing.md`](./testing.md#end-to-end-tests)).
 
 ## Performance
 
@@ -288,4 +293,4 @@ request under `/api` to `http://localhost:3000`, the API started with
 `Origin` header and passes the API's same-origin check on state-changing requests. It stands in for the gateway, which does the same in production
 (see [`architecture.md`](./architecture.md#gateway)).
 
-_Last updated by TF06._
+_Last updated by TF07._

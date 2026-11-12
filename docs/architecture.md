@@ -76,11 +76,15 @@ dependency for this reason.
 - **Frontend served from the host.** The gateway bind-mounts `./dist`, so `npm run build` must
   run before the stack starts, and a rebuild is picked up without rebuilding any image.
 - **The API is the only data store.** Every page reads and writes through `/api/v1` with
-  TanStack Query (see [`frontend.md`](./frontend.md#data-layer)); nothing is persisted in the
-  browser. Weights are stored in kg and lengths in cm; the display unit is the user's
-  `Goals.unit`, stored by the API, and the frontend converts for display only
-  (see [`frontend.md`](./frontend.md#units)).
+  TanStack Query (see [`frontend.md`](./frontend.md#data-layer)); no app data is persisted in
+  the browser (only the local-data import dismissal, see
+  [`frontend.md`](./frontend.md#local-data-import)). Weights are stored in kg and lengths in
+  cm; the display unit is the user's `Goals.unit`, stored by the API, and the frontend converts
+  for display only (see [`frontend.md`](./frontend.md#units)).
 - **`trustProxy` in production only.** The API trusts `X-Forwarded-For` only when it runs behind
   the gateway, so rate limits count the real client IP.
+- **Tested as deployed.** The Playwright suite runs against `docker-compose.prod.yml`, so every
+  journey goes through the gateway, the API and PostgreSQL (see
+  [`testing.md`](./testing.md#end-to-end-tests)).
 
-_Last updated by TF04._
+_Last updated by TF07._
