@@ -20,7 +20,11 @@ const NAV = [
   { to: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 
-const LOADING = <p className="muted">Loading…</p>
+const LOADING = (
+  <p role="status" className="muted">
+    Loading…
+  </p>
+)
 
 function ProtectedShell() {
   const location = useLocation()
@@ -49,7 +53,13 @@ function ProtectedShell() {
           Iron<span>Log</span>
         </div>
         {NAV.map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.to === '/'} className="nav-link">
+          <NavLink
+            key={n.to}
+            to={n.to}
+            end={n.to === '/'}
+            className="nav-link"
+            aria-label={n.label}
+          >
             <span className="nav-icon" aria-hidden>
               {n.icon}
             </span>
@@ -59,6 +69,7 @@ function ProtectedShell() {
         <button
           type="button"
           className="nav-link"
+          aria-label="Log out"
           disabled={logout.isPending}
           onClick={() => logout.mutate()}
         >

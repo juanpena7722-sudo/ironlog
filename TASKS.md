@@ -143,7 +143,7 @@ Releases (versioning, tags, deployment) are decided and triggered by the owner o
 1. Tests: banner only with local data; success clears local data and refreshes; failure keeps local data and
    shows the error; replace requires confirmation.
 
-### [ ] TF06 — UX states, accessibility, performance
+### [x] TF06 — UX states, accessibility, performance
 
 **Branch:** `feat/tf06-ux-a11y`
 

@@ -68,12 +68,12 @@ character returns `Must not contain NUL characters`.
 
 ## Request protection
 
-| Rule              | Applies to                                    | Response                                                                                                                           |
-| ----------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Origin check      | Every request except `GET`, `HEAD`, `OPTIONS` | 403 `Cross-origin request rejected` if `Origin` is present and its host differs from the request `Host` (including `Origin: null`) |
-| Auth rate limit   | Each `/api/v1/auth/*` route, per client IP    | 429 after 10 requests in 1 minute, with a `Retry-After` header                                                                     |
-| Global rate limit | Every other route, per client IP              | 429 after 300 requests in 1 minute, with a `Retry-After` header                                                                    |
-| Body limit        | Every request body                            | 413 `Request body is too large` over 100 KB (5 MB for `POST /api/v1/backup/import`)                                                |
+| Rule              | Applies to                                                                                                    | Response                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Origin check      | Every request except `GET`, `HEAD`, `OPTIONS`                                                                 | 403 `Cross-origin request rejected` if `Origin` is present and its host differs from the request `Host` (including `Origin: null`) |
+| Auth rate limit   | `POST /api/v1/auth/register`, `POST /api/v1/auth/login` and `DELETE /api/v1/auth/account`, each per client IP | 429 after 10 requests in 1 minute, with a `Retry-After` header                                                                     |
+| Global rate limit | Every other route (including `GET /api/v1/auth/me` and `POST /api/v1/auth/logout`), per client IP             | 429 after 300 requests in 1 minute, with a `Retry-After` header                                                                    |
+| Body limit        | Every request body                                                                                            | 413 `Request body is too large` over 100 KB (5 MB for `POST /api/v1/backup/import`)                                                |
 
 Requests without an `Origin` header are not blocked by the Origin check.
 
@@ -146,7 +146,7 @@ Auth: none · Rate limit: 10/min per IP
 
 ### POST /api/v1/auth/logout
 
-Auth: none · Rate limit: 10/min per IP
+Auth: none · Rate limit: global (300/min per IP)
 
 Clears the `session` cookie. No body.
 
@@ -160,7 +160,7 @@ Clears the `session` cookie. No body.
 
 ### GET /api/v1/auth/me
 
-Auth: required · Rate limit: 10/min per IP
+Auth: required · Rate limit: global (300/min per IP)
 
 **Responses**
 
@@ -741,4 +741,4 @@ Example 200 body:
 An export larger than 5 MB cannot be imported. The import times out after 120 s and then
 returns 500 with no changes.
 
-_Last updated by TF05._
+_Last updated by TF06._

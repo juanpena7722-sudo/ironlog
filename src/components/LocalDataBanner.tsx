@@ -24,6 +24,7 @@ export default function LocalDataBanner() {
   const [data, setData] = useState(readLocalData)
   const importData = useImportData()
 
+  if (importData.isSuccess) return <p role="status">Local data imported.</p>
   if (!data) return null
 
   const importLocal = () =>

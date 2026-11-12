@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import type { InputHTMLAttributes, ReactNode } from 'react'
+import { errorMessage } from '../api/auth'
 
 export function Card({
   title,
@@ -66,6 +67,54 @@ export function Meter({
 
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>
+}
+
+type QueryLike = { isPending: boolean; error: Error | null; refetch: () => unknown }
+
+/** Shows loading or an error with retry until every query has data, then the children. */
+export function QueryState({ queries, children }: { queries: QueryLike[]; children?: ReactNode }) {
+  const failed = queries.filter((q) => q.error)
+  const error = failed[0]?.error
+  if (error) {
+    return (
+      <div className="query-error">
+        <p role="alert">Could not load your data. {errorMessage(error)}</p>
+        <button type="button" onClick={() => failed.forEach((q) => q.refetch())}>
+          Retry
+        </button>
+      </div>
+    )
+  }
+  if (queries.some((q) => q.isPending)) {
+    return (
+      <p role="status" className="muted">
+        Loading…
+      </p>
+    )
+  }
+  return children
+}
+
+type MutationLike = { isSuccess: boolean; error: Error | null; submittedAt: number }
+
+/** Announces the result of the most recent of the given mutations. */
+export function MutationFeedback({ mutations }: { mutations: [MutationLike, string][] }) {
+  const [mutation, success] = mutations.reduce(
+    (latest, item) => (item[0].submittedAt > latest[0].submittedAt ? item : latest),
+    mutations[0],
+  )
+  return (
+    <>
+      <p role="status" className="toast">
+        {mutation.isSuccess ? success : ''}
+      </p>
+      {mutation.error && (
+        <p role="alert" className="toast error">
+          {errorMessage(mutation.error)}
+        </p>
+      )}
+    </>
+  )
 }
 
 export function PageHead({ title, sub }: { title: string; sub?: string }) {

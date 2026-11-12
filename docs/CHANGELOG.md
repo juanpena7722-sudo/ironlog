@@ -1,5 +1,25 @@
 # Changelog
 
+## TF06 — UX states, accessibility, performance (2026-11-11)
+
+- Added: `QueryState` and `MutationFeedback` in `src/components/ui.tsx`. Every page shows
+  loading (`role="status"`), an error with **Retry** (`role="alert"`, the server's `detail`) and,
+  only after the data has loaded, its empty state. Every save and delete reports its result.
+- Added: accessible names on the nav links, **Log out**, the icon-only ✕ buttons and the
+  unlabelled inputs; `aria-expanded` on workout history rows; a `:focus-visible` outline; a
+  `.sr-only` class for the `Actions` table headers; links inside paragraphs are underlined.
+- Added: Workouts **Save workout** with no named exercise shows `Add at least one exercise with a
+name.` with `aria-invalid` on the first exercise name.
+- Changed: `--danger` is `#f87171`; new `--danger-strong` (`#dc2626`) for solid danger buttons.
+- Changed: the Dashboard chart is the lazy-loaded `WeightTrendChart`, so Recharts is not in the
+  first load (122.3 KB gzipped on `/login`, 124.2 KB on the Dashboard).
+- Changed: Settings shows successes in `role="status"` and errors in `role="alert"`; errors from
+  save targets, clear all logs and demo data are now shown. `LocalDataBanner` shows `Local data
+imported.`
+- Fixed: many quick reloads showed `Could not check your session.`: `GET /auth/me` and
+  `POST /auth/logout` now use only the global 300/min limit (register, login and account
+  deletion keep 10/min), and `useImportData()` no longer refetches the session.
+
 ## TF05 — Backup and local-data migration (2026-11-11)
 
 - Added: **Import mode** in Settings: backups import with `POST /backup/import` in `merge`

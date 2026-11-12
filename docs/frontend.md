@@ -2,18 +2,18 @@
 
 ## Structure
 
-| Path                | Contents                                                                                                                                                                     |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/main.tsx`      | Entry point. Renders `App` inside `QueryClientProvider` and `HashRouter`.                                                                                                    |
-| `src/App.tsx`       | Routes, the `ProtectedShell` session guard and the navigation. Every page is lazy-loaded with `React.lazy`.                                                                  |
-| `src/pages/`        | One component per route: `Dashboard`, `Workouts`, `Diet`, `Progress`, `Health`, `Settings`, and `Auth` for `/login` and `/register`.                                         |
-| `src/components/`   | Shared UI in `ui.tsx`: `Card`, `Stat`, `Meter`, `Empty`, `PageHead`, `Field` and the `chart` constants. `LocalDataBanner.tsx` (see [Local data import](#local-data-import)). |
-| `src/store.tsx`     | Query hooks and mutations for the app data (see [Data layer](#data-layer)), `DEFAULT_GOALS`, `normalize()` and `unitHintFor()`.                                              |
-| `src/units.ts`      | kg/cm to display unit conversion (see [Units](#units)).                                                                                                                      |
-| `src/api/client.ts` | API client (see below).                                                                                                                                                      |
-| `src/api/auth.ts`   | Session and account hooks (see [Authentication](#authentication)).                                                                                                           |
-| `src/types.ts`      | Re-exports the data types and constants from `shared/schemas.ts`.                                                                                                            |
-| `src/test/`         | Test setup and MSW handlers (see [`testing.md`](./testing.md)).                                                                                                              |
+| Path                | Contents                                                                                                                                                                                                                                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main.tsx`      | Entry point. Renders `App` inside `QueryClientProvider` and `HashRouter`.                                                                                                                                                                                                                                                                   |
+| `src/App.tsx`       | Routes, the `ProtectedShell` session guard and the navigation. Every page is lazy-loaded with `React.lazy`.                                                                                                                                                                                                                                 |
+| `src/pages/`        | One component per route: `Dashboard`, `Workouts`, `Diet`, `Progress`, `Health`, `Settings`, and `Auth` for `/login` and `/register`.                                                                                                                                                                                                        |
+| `src/components/`   | Shared UI in `ui.tsx`: `Card`, `Stat`, `Meter`, `Empty`, `QueryState`, `MutationFeedback`, `PageHead`, `Field` and the `chart` constants (see [Page states](#page-states)). `WeightTrendChart.tsx`, the lazy-loaded Dashboard chart (see [Performance](#performance)). `LocalDataBanner.tsx` (see [Local data import](#local-data-import)). |
+| `src/store.tsx`     | Query hooks and mutations for the app data (see [Data layer](#data-layer)), `DEFAULT_GOALS`, `normalize()` and `unitHintFor()`.                                                                                                                                                                                                             |
+| `src/units.ts`      | kg/cm to display unit conversion (see [Units](#units)).                                                                                                                                                                                                                                                                                     |
+| `src/api/client.ts` | API client (see below).                                                                                                                                                                                                                                                                                                                     |
+| `src/api/auth.ts`   | Session and account hooks (see [Authentication](#authentication)).                                                                                                                                                                                                                                                                          |
+| `src/types.ts`      | Re-exports the data types and constants from `shared/schemas.ts`.                                                                                                                                                                                                                                                                           |
+| `src/test/`         | Test setup and MSW handlers (see [`testing.md`](./testing.md)).                                                                                                                                                                                                                                                                             |
 
 ## Routes
 
@@ -66,13 +66,14 @@ set to `null` and the app navigates to `/login`.
 
 `ProtectedShell` in `src/App.tsx` guards every protected route:
 
-- while the session loads it shows `Loading…`;
+- while the session loads it shows `Loading…` (`role="status"`);
 - if the session check fails (not a 401) it shows `Could not check your session.` with a
   **Retry** button;
 - with no session it redirects to `/login` and passes the original path and query string as
   `state.from`;
 - with a session it renders the navigation, which ends with a **Log out** button,
-  `LocalDataBanner` and the page. A failed logout shows its error above the page.
+  `LocalDataBanner` and the page. Each nav link has an `aria-label` with its name (the emoji
+  icon is `aria-hidden`), and the button has `aria-label="Log out"`. A failed logout shows its error above the page.
 
 `src/pages/Auth.tsx` renders the login and register forms. It validates with `LoginSchema` or
 `RegisterSchema` from `shared/schemas.ts` before sending. Invalid fields show the schema's
@@ -132,18 +133,20 @@ history. Responses are validated with the schemas from `shared/schemas.ts`.
 
 **Mutations.** Each one invalidates its collection's queries on success.
 
-| Hook                 | Request                                                                                                                               | Invalidates |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `useSaveWorkout()`   | `{ id?, entry }`: `PUT /workouts/:id` when `id` is set, otherwise `POST /workouts`                                                    | `workouts`  |
-| `useDeleteWorkout()` | `DELETE /workouts/:id`                                                                                                                | `workouts`  |
-| `useAddFood()`       | `POST /foods`                                                                                                                         | `foods`     |
-| `useDeleteFood()`    | `DELETE /foods/:id`                                                                                                                   | `foods`     |
-| `useSaveBody()`      | `{ id?, entry }`: `PUT /body/:id` or `POST /body`                                                                                     | `body`      |
-| `useDeleteBody()`    | `DELETE /body/:id`                                                                                                                    | `body`      |
-| `useSaveHealth()`    | `PUT /health-entries/:date` (create or update the day)                                                                                | `health`    |
-| `useDeleteHealth()`  | `DELETE /health-entries/:date`                                                                                                        | `health`    |
-| `useSaveGoals()`     | `PUT /goals`                                                                                                                          | `goals`     |
-| `useImportData()`    | `{ data, mode, unitHint? }`: `POST /backup/import?mode=<mode>&unitHint=<unitHint>` with a full `AppData`; `unitHint` defaults to `kg` | everything  |
+| Hook                 | Request                                                                                                                               | Invalidates                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `useSaveWorkout()`   | `{ id?, entry }`: `PUT /workouts/:id` when `id` is set, otherwise `POST /workouts`                                                    | `workouts`                     |
+| `useDeleteWorkout()` | `DELETE /workouts/:id`                                                                                                                | `workouts`                     |
+| `useAddFood()`       | `POST /foods`                                                                                                                         | `foods`                        |
+| `useDeleteFood()`    | `DELETE /foods/:id`                                                                                                                   | `foods`                        |
+| `useSaveBody()`      | `{ id?, entry }`: `PUT /body/:id` or `POST /body`                                                                                     | `body`                         |
+| `useDeleteBody()`    | `DELETE /body/:id`                                                                                                                    | `body`                         |
+| `useSaveHealth()`    | `PUT /health-entries/:date` (create or update the day)                                                                                | `health`                       |
+| `useDeleteHealth()`  | `DELETE /health-entries/:date`                                                                                                        | `health`                       |
+| `useSaveGoals()`     | `PUT /goals`                                                                                                                          | `goals`                        |
+| `useImportData()`    | `{ data, mode, unitHint? }`: `POST /backup/import?mode=<mode>&unitHint=<unitHint>` with a full `AppData`; `unitHint` defaults to `kg` | every query except the session |
+
+An import does not change the session, so `useImportData()` does not fetch `GET /auth/me` again.
 
 Pages keep their look and behaviour. Forms are cleared only after a successful save. The Health
 and Settings forms show the stored values until the user edits a field.
@@ -152,7 +155,10 @@ and Settings forms show the stored values until the user edits a field.
 file, sends it through `normalize()` and imports it with `useImportData()` in the mode chosen in
 the **Import mode** select: **Merge (add new entries)** (the default) imports at once;
 **Replace all data** first asks for confirmation. A file that is not valid JSON shows `That file
-is not a valid IronLog backup.`; an API error shows the server's `detail`. **Load demo data**
+is not a valid IronLog backup.`; an API error shows the server's `detail`. Settings messages
+last 3 seconds: successes (`Targets saved.`, `Data imported.`, `All logs cleared.`, `Demo data
+loaded.`) are shown in `role="status"`, and errors (save targets, export, import, clear all
+logs, demo data) in `role="alert"`. **Load demo data**
 sends `makeDemoData()` (with `DEFAULT_GOALS`) and **Clear all logs** sends empty collections with
 the saved goals unchanged, so targets and unit are kept; both use `mode=replace` with
 `unitHint=kg`. **Clear all logs** and its confirm button are disabled until `GET /goals` has
@@ -184,12 +190,73 @@ It shows a card (`aria-label="Import data from this browser"`) only when:
 - it has at least one workout, food, body or health entry (goals alone are not offered, because a
   merge import never changes goals).
 
-| Button                | Result                                                                                                                                                                                                                                                                                     |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Import local data** | `useImportData()` with `mode: 'merge'` and `unitHint` = the stored `goals.unit`. On success it removes `ironlog:data`, hides the card and every query is refreshed. On failure the data is kept, the card stays and the error shows in `role="alert"`. Buttons are disabled while it runs. |
-| **Dismiss**           | Sets `ironlog:local-import-dismissed` to `true` and hides the card. `ironlog:data` is kept.                                                                                                                                                                                                |
+| Button                | Result                                                                                                                                                                                                                                                                                                                                                         |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Import local data** | `useImportData()` with `mode: 'merge'` and `unitHint` = the stored `goals.unit`. On success it removes `ironlog:data`, replaces the card with `Local data imported.` (`role="status"`) and every query except the session is refreshed. On failure the data is kept, the card stays and the error shows in `role="alert"`. Buttons are disabled while it runs. |
+| **Dismiss**           | Sets `ironlog:local-import-dismissed` to `true` and hides the card. `ironlog:data` is kept.                                                                                                                                                                                                                                                                    |
 
 The dismissal is per browser, not per account.
+
+## Page states
+
+Every page shows the same three states, through two components in `src/components/ui.tsx`.
+
+| Export                              | What it does                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QueryState({ queries, children })` | If any query has failed it shows `Could not load your data. <message>` in `role="alert"` (the message is `errorMessage()`, so the server's `detail`) and a **Retry** button that refetches the failed queries. Otherwise, while any query is pending, it shows `Loading…` in `role="status"`. Once every query has data it renders `children`. |
+| `MutationFeedback({ mutations })`   | Takes `[mutation, successText]` pairs and reports the most recently submitted one: `successText` in a `role="status"` toast after it succeeds, or its error message in a `role="alert"` toast. The message stays until the next mutation.                                                                                                      |
+
+Conventions:
+
+- A page wraps its content in `QueryState` with every query it reads, so the empty state
+  (`Empty`, or the Dashboard welcome card) is shown only after the data has loaded, never while
+  it loads or after an error.
+- Workouts, Diet, Progress and Health render `MutationFeedback` with their save and delete
+  mutations (`Workout saved.` / `Workout deleted.`, `Food added.` / `Food removed.`,
+  `Check-in saved.` / `Check-in deleted.`, `Day saved.` / `Day deleted.`). Settings uses its own
+  messages (see [Data layer](#data-layer)) and a `QueryState` per card: the Targets card shows
+  the goals state above its form, and the data card shows the counts once the four collections
+  have loaded.
+- Workouts **Save workout** with no named exercise sends nothing. It shows `Add at least one
+exercise with a name.` in `role="alert"`, and the first exercise name gets `aria-invalid="true"`
+  and `aria-describedby` pointing at the message, until a name is typed.
+
+## Accessibility
+
+- Icon-only controls have an `aria-label`: the nav links, **Log out**, and the ✕ buttons
+  (`Remove exercise <n>`, `Remove set <n>`, `Remove <food>`, `Delete <date>`).
+- Inputs without a visible label have an `aria-label`: the Workouts exercise name and muscle
+  (`Exercise <n> name`, `Exercise <n> muscle`), set weight and reps (`Set <n> weight (<unit>)`,
+  `Set <n> reps`), the Diet `Date`, the Progress `Trend metric` select and the Settings `Backup
+JSON` textarea.
+- Workout history rows have `aria-expanded`.
+- Table columns that hold only buttons have a visually hidden `Actions` header. The `.sr-only`
+  class in `src/index.css` hides content visually and keeps it for screen readers. It is
+  `position: absolute`, so `.table-wrap` has `position: relative` to keep it inside the table's
+  scroll area; without it the hidden header widened the page at 360 px.
+- `a:focus-visible` and `button:focus-visible` get a 2 px `--accent` outline.
+- Links inside paragraphs (`p a`) are underlined, so they are not told apart by colour alone.
+  Nav links and other links are underlined only on hover.
+- Colour tokens: `--danger` is `#f87171` (danger text on the dark background), and
+  `--danger-strong` (`#dc2626`) is the background of solid danger buttons (`button.danger-solid`)
+  under white text. Both meet WCAG AA contrast.
+
+## Performance
+
+Route pages are lazy-loaded (see [Structure](#structure)). The Dashboard bodyweight chart is
+`WeightTrendChart`, loaded with `React.lazy` inside a `Suspense` that shows `Loading chart…`, so
+Recharts is not part of the first load. It is fetched only when there are at least two weigh-ins
+to draw; with fewer the card shows `Log a few weigh-ins to see your trend.`
+
+First-load JS on a production build (`npm run build`), gzipped, every script requested:
+
+| Page                                  | Gzipped JS |
+| ------------------------------------- | ---------- |
+| `/login`, logged out                  | 122.3 KB   |
+| Dashboard, logged in                  | 124.2 KB   |
+| Dashboard, after the chart has loaded | 236.2 KB   |
+
+The budget is 250 KB (PRODUCTION_RULES §3.6).
 
 ## Units
 
@@ -221,4 +288,4 @@ request under `/api` to `http://localhost:3000`, the API started with
 `Origin` header and passes the API's same-origin check on state-changing requests. It stands in for the gateway, which does the same in production
 (see [`architecture.md`](./architecture.md#gateway)).
 
-_Last updated by TF05._
+_Last updated by TF06._

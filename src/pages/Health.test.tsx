@@ -21,6 +21,7 @@ describe('Health', () => {
     renderWithProviders(<Health />)
 
     expect(await screen.findByText('Felt good', { selector: 'td' })).toBeDefined()
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeDefined()
     expect(screen.getByLabelText('Sleep (h)')).toHaveProperty('value', '7.5')
     expect(screen.getByRole('button', { name: 'Update day' })).toBeDefined()
     expect(screen.getByText('7.5 h', { selector: '.stat-value' })).toBeDefined()
@@ -31,7 +32,7 @@ describe('Health', () => {
     renderWithProviders(<Health />)
     const user = userEvent.setup()
 
-    await user.type(screen.getByLabelText('Sleep (h)'), '8')
+    await user.type(await screen.findByLabelText('Sleep (h)'), '8')
     await user.type(screen.getByLabelText('Steps'), '9000')
     await user.selectOptions(screen.getByLabelText('Energy'), '🔥 Great')
     await user.click(screen.getByRole('button', { name: 'Save day' }))
@@ -66,9 +67,12 @@ describe('Health', () => {
     const api = mockCollection('health-entries', [TODAY], 'date')
     renderWithProviders(<Health />)
 
-    await userEvent.setup().click(await screen.findByRole('button', { name: '✕' }))
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: `Delete ${fmtDate(TODAY.date)}` }))
 
     expect(await screen.findByText('No health logs yet.')).toBeDefined()
+    expect(screen.getByRole('status').textContent).toBe('Day deleted.')
     expect(api.requests.find((r) => r.method === 'DELETE')?.url.pathname).toBe(
       `/api/v1/health-entries/${TODAY.date}`,
     )

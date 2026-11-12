@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { DEFAULT_GOALS, useDeleteHealth, useGoals, useHealth, useSaveHealth } from '../store'
 import type { HealthEntry } from '../types'
-import { Card, Empty, PageHead, Stat, chart } from '../components/ui'
+import { Card, Empty, MutationFeedback, PageHead, QueryState, Stat, chart } from '../components/ui'
 import { byDateDesc, fmtDate, lastNDays, num, round, today, uid } from '../utils'
 
 type Form = {
@@ -46,8 +46,10 @@ const avg = (xs: (number | undefined)[]) => {
 }
 
 export default function Health() {
-  const entries = useHealth().data ?? NO_ENTRIES
-  const g = useGoals().data ?? DEFAULT_GOALS
+  const healthQuery = useHealth()
+  const goalsQuery = useGoals()
+  const entries = healthQuery.data ?? NO_ENTRIES
+  const g = goalsQuery.data ?? DEFAULT_GOALS
   const saveHealth = useSaveHealth()
   const deleteHealth = useDeleteHealth()
   const [date, setDate] = useState(today())
@@ -96,176 +98,189 @@ export default function Health() {
         title="Health"
         sub="Recovery drives growth: sleep, hydration, heart rate and energy."
       />
+      <MutationFeedback
+        mutations={[
+          [saveHealth, 'Day saved.'],
+          [deleteHealth, 'Day deleted.'],
+        ]}
+      />
+      <QueryState queries={[healthQuery, goalsQuery]}>
+        <div className="stats">
+          <Stat
+            label="Avg sleep (7d)"
+            value={fmt(avg(week.map((h) => h?.sleepHours)), ' h')}
+            sub={`Goal ${g.sleepHours} h`}
+          />
+          <Stat
+            label="Avg water (7d)"
+            value={fmt(avg(week.map((h) => h?.waterL)), ' L')}
+            sub={`Goal ${g.waterL} L`}
+          />
+          <Stat
+            label="Resting HR (7d)"
+            value={fmt(avg(week.map((h) => h?.restingHR)), ' bpm', 0)}
+          />
+          <Stat label="Avg steps (7d)" value={fmt(avg(week.map((h) => h?.steps)), '', 0)} />
+        </div>
 
-      <div className="stats">
-        <Stat
-          label="Avg sleep (7d)"
-          value={fmt(avg(week.map((h) => h?.sleepHours)), ' h')}
-          sub={`Goal ${g.sleepHours} h`}
-        />
-        <Stat
-          label="Avg water (7d)"
-          value={fmt(avg(week.map((h) => h?.waterL)), ' L')}
-          sub={`Goal ${g.waterL} L`}
-        />
-        <Stat label="Resting HR (7d)" value={fmt(avg(week.map((h) => h?.restingHR)), ' bpm', 0)} />
-        <Stat label="Avg steps (7d)" value={fmt(avg(week.map((h) => h?.steps)), '', 0)} />
-      </div>
+        <div className="grid-2">
+          <Card title="Daily log">
+            <form onSubmit={submit}>
+              <div className="form-grid">
+                <label>
+                  Date
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => selectDate(e.target.value || today())}
+                  />
+                </label>
+                <label>
+                  Sleep (h)
+                  <input
+                    type="number"
+                    step={0.25}
+                    min={0}
+                    max={24}
+                    value={form.sleepHours}
+                    onChange={(e) => setForm({ ...form, sleepHours: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Water (L)
+                  <input
+                    type="number"
+                    step={0.25}
+                    min={0}
+                    value={form.waterL}
+                    onChange={(e) => setForm({ ...form, waterL: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Resting HR (bpm)
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.restingHR}
+                    onChange={(e) => setForm({ ...form, restingHR: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Steps
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.steps}
+                    onChange={(e) => setForm({ ...form, steps: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Energy
+                  <select
+                    value={form.energy}
+                    onChange={(e) => setForm({ ...form, energy: e.target.value })}
+                  >
+                    {ENERGY.map((l, i) => (
+                      <option key={i} value={i === 0 ? '' : i}>
+                        {l || '—'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="block">
+                Notes
+                <textarea
+                  rows={2}
+                  value={form.notes}
+                  placeholder="Soreness, stress, supplements, bloodwork…"
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </label>
+              <button type="submit">{existing ? 'Update day' : 'Save day'}</button>
+            </form>
+          </Card>
 
-      <div className="grid-2">
-        <Card title="Daily log">
-          <form onSubmit={submit}>
-            <div className="form-grid">
-              <label>
-                Date
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => selectDate(e.target.value || today())}
-                />
-              </label>
-              <label>
-                Sleep (h)
-                <input
-                  type="number"
-                  step={0.25}
-                  min={0}
-                  max={24}
-                  value={form.sleepHours}
-                  onChange={(e) => setForm({ ...form, sleepHours: e.target.value })}
-                />
-              </label>
-              <label>
-                Water (L)
-                <input
-                  type="number"
-                  step={0.25}
-                  min={0}
-                  value={form.waterL}
-                  onChange={(e) => setForm({ ...form, waterL: e.target.value })}
-                />
-              </label>
-              <label>
-                Resting HR (bpm)
-                <input
-                  type="number"
-                  min={0}
-                  value={form.restingHR}
-                  onChange={(e) => setForm({ ...form, restingHR: e.target.value })}
-                />
-              </label>
-              <label>
-                Steps
-                <input
-                  type="number"
-                  min={0}
-                  value={form.steps}
-                  onChange={(e) => setForm({ ...form, steps: e.target.value })}
-                />
-              </label>
-              <label>
-                Energy
-                <select
-                  value={form.energy}
-                  onChange={(e) => setForm({ ...form, energy: e.target.value })}
-                >
-                  {ENERGY.map((l, i) => (
-                    <option key={i} value={i === 0 ? '' : i}>
-                      {l || '—'}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          <Card title="Last 14 days">
+            <div className="chart">
+              <ResponsiveContainer width="100%" height={280}>
+                <ComposedChart data={series}>
+                  <CartesianGrid stroke={chart.grid} vertical={false} />
+                  <XAxis dataKey="label" tick={chart.axis} tickLine={false} axisLine={false} />
+                  <YAxis tick={chart.axis} tickLine={false} axisLine={false} width={32} />
+                  <Tooltip {...chart.tooltip} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar
+                    dataKey="sleep"
+                    name="Sleep (h)"
+                    fill={chart.secondary}
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Line
+                    dataKey="water"
+                    name="Water (L)"
+                    stroke={chart.tertiary}
+                    strokeWidth={2}
+                    connectNulls
+                    dot={{ r: 2 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
-            <label className="block">
-              Notes
-              <textarea
-                rows={2}
-                value={form.notes}
-                placeholder="Soreness, stress, supplements, bloodwork…"
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              />
-            </label>
-            <button type="submit">{existing ? 'Update day' : 'Save day'}</button>
-          </form>
-        </Card>
+          </Card>
+        </div>
 
-        <Card title="Last 14 days">
-          <div className="chart">
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={series}>
-                <CartesianGrid stroke={chart.grid} vertical={false} />
-                <XAxis dataKey="label" tick={chart.axis} tickLine={false} axisLine={false} />
-                <YAxis tick={chart.axis} tickLine={false} axisLine={false} width={32} />
-                <Tooltip {...chart.tooltip} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar
-                  dataKey="sleep"
-                  name="Sleep (h)"
-                  fill={chart.secondary}
-                  radius={[4, 4, 0, 0]}
-                />
-                <Line
-                  dataKey="water"
-                  name="Water (L)"
-                  stroke={chart.tertiary}
-                  strokeWidth={2}
-                  connectNulls
-                  dot={{ r: 2 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </div>
-
-      <Card title="History">
-        {entries.length === 0 ? (
-          <Empty>No health logs yet.</Empty>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Sleep</th>
-                  <th>Water</th>
-                  <th>RHR</th>
-                  <th>Steps</th>
-                  <th>Energy</th>
-                  <th>Notes</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {[...entries].sort(byDateDesc).map((h) => (
-                  <tr key={h.id}>
-                    <td>
-                      <button className="link" onClick={() => selectDate(h.date)}>
-                        {fmtDate(h.date)}
-                      </button>
-                    </td>
-                    <td>{fmt(h.sleepHours, ' h')}</td>
-                    <td>{fmt(h.waterL, ' L')}</td>
-                    <td>{fmt(h.restingHR, '', 0)}</td>
-                    <td>{h.steps?.toLocaleString() ?? '—'}</td>
-                    <td>{h.energy ? ENERGY[h.energy] : '—'}</td>
-                    <td className="muted notes">{h.notes ?? ''}</td>
-                    <td>
-                      <button
-                        className="ghost danger small"
-                        onClick={() => deleteHealth.mutate(h.date)}
-                      >
-                        ✕
-                      </button>
-                    </td>
+        <Card title="History">
+          {entries.length === 0 ? (
+            <Empty>No health logs yet.</Empty>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Sleep</th>
+                    <th>Water</th>
+                    <th>RHR</th>
+                    <th>Steps</th>
+                    <th>Energy</th>
+                    <th>Notes</th>
+                    <th>
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                </thead>
+                <tbody>
+                  {[...entries].sort(byDateDesc).map((h) => (
+                    <tr key={h.id}>
+                      <td>
+                        <button className="link" onClick={() => selectDate(h.date)}>
+                          {fmtDate(h.date)}
+                        </button>
+                      </td>
+                      <td>{fmt(h.sleepHours, ' h')}</td>
+                      <td>{fmt(h.waterL, ' L')}</td>
+                      <td>{fmt(h.restingHR, '', 0)}</td>
+                      <td>{h.steps?.toLocaleString() ?? '—'}</td>
+                      <td>{h.energy ? ENERGY[h.energy] : '—'}</td>
+                      <td className="muted notes">{h.notes ?? ''}</td>
+                      <td>
+                        <button
+                          className="ghost danger small"
+                          aria-label={`Delete ${fmtDate(h.date)}`}
+                          onClick={() => deleteHealth.mutate(h.date)}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </QueryState>
     </>
   )
 }

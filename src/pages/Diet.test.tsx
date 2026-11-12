@@ -39,7 +39,7 @@ describe('Diet', () => {
     renderWithProviders(<Diet />)
     const user = userEvent.setup()
 
-    await user.type(screen.getByLabelText('Food'), 'Rice')
+    await user.type(await screen.findByLabelText('Food'), 'Rice')
     await user.selectOptions(screen.getByLabelText('Meal'), 'Lunch')
     await user.type(screen.getByLabelText('Carbs (g)'), '50')
     await user.type(screen.getByLabelText('Protein (g)'), '5')
@@ -64,7 +64,7 @@ describe('Diet', () => {
     renderWithProviders(<Diet />)
     const user = userEvent.setup()
 
-    await user.selectOptions(screen.getByLabelText('Meal'), 'Snack')
+    await user.selectOptions(await screen.findByLabelText('Meal'), 'Snack')
     await user.click(await screen.findByRole('button', { name: '+ Oats' }))
 
     expect(await screen.findByText('Snack', { selector: 'strong' })).toBeDefined()
@@ -79,9 +79,10 @@ describe('Diet', () => {
     const api = mockCollection('foods', [OATS])
     renderWithProviders(<Diet />)
 
-    await userEvent.setup().click(await screen.findByRole('button', { name: '✕' }))
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Remove Oats' }))
 
     expect(await screen.findByText('Nothing logged for this day.')).toBeDefined()
+    expect(screen.getByRole('status').textContent).toBe('Food removed.')
     expect(api.requests.find((r) => r.method === 'DELETE')?.url.pathname).toBe(
       `/api/v1/foods/${OATS.id}`,
     )
