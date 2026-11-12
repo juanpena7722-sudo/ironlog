@@ -392,7 +392,8 @@ export default function Workouts() {
             {prs.length === 0 ? (
               <Empty>Log a workout to see your PRs.</Empty>
             ) : (
-              <div className="table-wrap">
+              // Focusable so keyboard users can scroll it when it overflows on narrow screens.
+              <div className="table-wrap" role="region" aria-label="Personal records" tabIndex={0}>
                 <table>
                   <thead>
                     <tr>

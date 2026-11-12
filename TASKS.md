@@ -158,7 +158,7 @@ Releases (versioning, tags, deployment) are decided and triggered by the owner o
 1. Tests for loading, error + retry and empty states on each page.
 2. Bundle size within budget (reported in the Handoff).
 
-### [ ] TF07 — End-to-end and accessibility suite in CI
+### [?] TF07 — End-to-end and accessibility suite in CI
 
 **Branch:** `test/tf07-e2e`
 

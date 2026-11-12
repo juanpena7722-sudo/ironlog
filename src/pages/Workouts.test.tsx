@@ -39,6 +39,15 @@ describe('Workouts', () => {
     expect(api.requests[0].url.searchParams.get('from')).toBe('1970-01-01')
   })
 
+  it('lets keyboard users reach the records table to scroll it', async () => {
+    mockCollection('workouts', [PUSH])
+    renderWithProviders(<Workouts />)
+
+    const region = await screen.findByRole('region', { name: 'Personal records' })
+    expect(region.tabIndex).toBe(0)
+    expect(within(region).getByRole('table')).toBeDefined()
+  })
+
   it('creates a workout', async () => {
     const api = mockCollection<Workout>('workouts', [])
     renderWithProviders(<Workouts />)
