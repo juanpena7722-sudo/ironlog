@@ -60,6 +60,27 @@ describe('Workouts', () => {
     })
   })
 
+  it('explains why a workout without a named exercise is not saved', async () => {
+    const api = mockCollection<Workout>('workouts', [])
+    renderWithProviders(<Workouts />)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: '+ Log workout' }))
+    await user.click(screen.getByRole('button', { name: 'Save workout' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe('Add at least one exercise with a name.')
+    const exercise = screen.getByLabelText('Exercise 1 name')
+    expect(exercise.getAttribute('aria-invalid')).toBe('true')
+    expect(exercise.getAttribute('aria-describedby')).toBe(alert.id)
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeDefined()
+    expect(api.requests.filter((r) => r.method !== 'GET')).toEqual([])
+
+    await user.type(exercise, 'Squat')
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(exercise.getAttribute('aria-invalid')).toBeNull()
+  })
+
   it('edits a workout', async () => {
     const api = mockCollection('workouts', [PUSH])
     renderWithProviders(<Workouts />)

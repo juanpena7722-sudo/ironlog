@@ -21,6 +21,7 @@ describe('Health', () => {
     renderWithProviders(<Health />)
 
     expect(await screen.findByText('Felt good', { selector: 'td' })).toBeDefined()
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeDefined()
     expect(screen.getByLabelText('Sleep (h)')).toHaveProperty('value', '7.5')
     expect(screen.getByRole('button', { name: 'Update day' })).toBeDefined()
     expect(screen.getByText('7.5 h', { selector: '.stat-value' })).toBeDefined()

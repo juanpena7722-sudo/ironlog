@@ -24,6 +24,7 @@ describe('Progress', () => {
 
     expect(await screen.findByText('82.5 kg')).toBeDefined()
     expect(rows()).toHaveLength(1)
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeDefined()
     expect(within(rows()[0]).getByText('81')).toBeDefined()
   })
 

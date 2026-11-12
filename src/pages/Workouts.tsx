@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DEFAULT_GOALS, useDeleteWorkout, useGoals, useSaveWorkout, useWorkouts } from '../store'
 import { MUSCLES } from '../types'
@@ -54,6 +54,8 @@ export default function Workouts() {
   const display = (kg: number) => toDisplayWeight(kg, unit)
   const [draft, setDraft] = useState<Workout | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [invalidDraftId, setInvalidDraftId] = useState<string>()
+  const missingExerciseId = useId()
 
   const workouts = useMemo(() => [...allWorkouts].sort(byDateDesc), [allWorkouts])
 
@@ -134,6 +136,8 @@ export default function Workouts() {
   }
 
   const isEditing = draft !== null && allWorkouts.some((w) => w.id === draft.id)
+  const isMissingExercise =
+    draft !== null && draft.id === invalidDraftId && !draft.exercises.some((e) => e.name.trim())
 
   const save = () => {
     if (!draft) return
@@ -144,7 +148,10 @@ export default function Workouts() {
         .filter((e) => e.name.trim())
         .map((e) => ({ ...e, name: e.name.trim(), sets: e.sets.filter((s) => s.reps > 0) })),
     }
-    if (cleaned.exercises.length === 0) return
+    if (cleaned.exercises.length === 0) {
+      setInvalidDraftId(draft.id)
+      return
+    }
     saveWorkout.mutate(
       {
         id: isEditing ? cleaned.id : undefined,
@@ -207,6 +214,8 @@ export default function Workouts() {
                   <input
                     list="exercise-names"
                     aria-label={`Exercise ${i + 1} name`}
+                    aria-invalid={isMissingExercise && i === 0 ? true : undefined}
+                    aria-describedby={isMissingExercise && i === 0 ? missingExerciseId : undefined}
                     placeholder="Exercise (e.g. Bench Press)"
                     value={ex.name}
                     onChange={(e) => {
@@ -242,7 +251,9 @@ export default function Workouts() {
                       <th>Weight ({unit})</th>
                       <th>Reps</th>
                       <th>e1RM</th>
-                      <th />
+                      <th>
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -333,6 +344,11 @@ export default function Workouts() {
               />
             </label>
 
+            {isMissingExercise && (
+              <p role="alert" id={missingExerciseId} className="field-error">
+                Add at least one exercise with a name.
+              </p>
+            )}
             <div className="actions">
               <button onClick={save}>Save workout</button>
               <button className="ghost" onClick={() => setDraft(null)}>

@@ -239,7 +239,9 @@ export default function Progress() {
                     {FIELDS.map(([k, l]) => (
                       <th key={k}>{l}</th>
                     ))}
-                    <th />
+                    <th>
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

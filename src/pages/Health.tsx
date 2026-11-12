@@ -245,7 +245,9 @@ export default function Health() {
                     <th>Steps</th>
                     <th>Energy</th>
                     <th>Notes</th>
-                    <th />
+                    <th>
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
